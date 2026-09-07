@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Bónus Lodja - Compre e ganhe</title>
+  
+  <script>
+    /* Base path automático para GitHub Pages (repo em subpasta) */
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,system-ui,sans-serif;min-height:100vh;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#e2e8f0;display:flex;align-items:center;justify-content:center}
+    .login-page{width:100%;padding:24px}
+    .login-card{max-width:400px;margin:0 auto;background:#1e293b;border:1px solid #334155;border-radius:16px;padding:32px;box-shadow:0 20px 40px rgba(0,0,0,.35)}
+    .logo-big{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px;margin:0 auto 16px}
+    h1{text-align:center;font-size:1.35rem;margin-bottom:6px}
+    .login-card>p{text-align:center;color:#94a3b8;font-size:14px;margin-bottom:20px}
+    .form-control{width:100%;padding:12px 14px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#f1f5f9;font-size:15px;margin-bottom:12px}
+    .btn{display:inline-block;border:none;cursor:pointer;border-radius:10px;font-weight:600}
+    .btn-primary{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;width:100%;padding:12px}
+    .btn-primary:hover{filter:brightness(1.08)}
+    .alert{padding:10px 12px;border-radius:8px;margin-bottom:12px;font-size:14px}
+    .alert-danger{background:#7f1d1d;color:#fecaca}
+    .hidden{display:none!important}
+  </style>
+
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="logo-big">B</div>
+      <h1>Bónus Lodja - Compre e ganhe</h1>
+      <p>Painel Administrativo</p>
+      <div id="alert" class="alert alert-danger hidden"></div>
+      <form id="loginForm">
+        <input type="password" id="password" class="form-control" placeholder="Introduza a palavra-passe" required autofocus>
+        <button type="submit" class="btn btn-primary" id="btnLogin">Entrar</button>
+      </form>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    try { initSupabase(); } catch (e) { console.error(e); }
+    if (typeof Auth !== 'undefined' && Auth.isLoggedIn()) window.location.href = 'dashboard.html';
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btnLogin');
+      const alertEl = document.getElementById('alert');
+      alertEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = 'A verificar...';
+      try {
+        const ok = await Auth.login(document.getElementById('password').value);
+        if (ok) window.location.href = 'dashboard.html';
+        else {
+          alertEl.textContent = 'Palavra-passe incorrecta.';
+          alertEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        console.error(err);
+        alertEl.textContent = 'Erro de ligação. Verifique a internet.';
+        alertEl.classList.remove('hidden');
+      }
+      btn.disabled = false;
+      btn.textContent = 'Entrar';
+    });
+  </script>
+</body>
+</html>

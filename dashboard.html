@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+
+  <script>
+    /* Base path automático para GitHub Pages (repo em subpasta) */
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Bónus Lodja - Compre e ganhe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">B</div>
+        <div>
+          <h1>Bónus Lodja - Compre e ganhe</h1>
+          <span>Painel Admin</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item active" data-page="dashboard"><span class="icon">📊</span> Dashboard</a>
+        <a href="clientes.html" class="nav-item" data-page="clientes"><span class="icon">👥</span> Clientes</a>
+        <a href="compras.html" class="nav-item" data-page="compras"><span class="icon">🛒</span> Compras</a>
+        <a href="elegiveis.html" class="nav-item" data-page="elegiveis"><span class="icon">⭐</span> Elegíveis</a>
+        <a href="sorteios.html" class="nav-item" data-page="sorteios"><span class="icon">🎡</span> Sorteios</a>
+        <a href="premios.html" class="nav-item" data-page="premios"><span class="icon">🎁</span> Prémios</a>
+        <a href="entregas.html" class="nav-item" data-page="entregas"><span class="icon">📦</span> Entregas</a>
+        <a href="relatorios.html" class="nav-item" data-page="relatorios"><span class="icon">📈</span> Relatórios</a>
+        <a href="configuracoes.html" class="nav-item" data-page="config"><span class="icon">⚙️</span> Configurações</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" onclick="Auth.logout()"><span class="icon">🚪</span> Sair</button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay" id="overlay"></div>
+
+    <!-- MAIN -->
+    <div class="main-content">
+      <header class="topbar">
+        <div class="d-flex align-center gap-2">
+          <button class="menu-toggle" id="menuToggle">☰</button>
+          <h2>Dashboard</h2>
+        </div>
+        <div class="topbar-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="file" id="fileImport" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importarFicheiro(event)">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('fileImport').click()">📂 Importar Excel</button>
+          <button class="btn btn-outline btn-sm" onclick="exportarExcel()">⬇ Descarregar Excel</button>
+          <button class="btn btn-outline btn-sm" onclick="reimportarLimpo()">📥 Limpar e carregar lista da loja</button>
+        </div>
+</header>
+
+      <div class="content">
+        <div class="stats-grid" id="statsGrid">
+          <!-- preenchido via JS -->
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h3>Últimos Sorteios</h3>
+            <a href="sorteios.html" class="btn btn-outline btn-sm">Ver todos</a>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Prémio</th>
+                  <th>Código</th>
+                  <th>Data</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="ultimosSorteios">
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h3>Clientes Elegíveis (sem link gerado ou link pendente)</h3>
+            <a href="elegiveis.html" class="btn btn-outline btn-sm">Gerir</a>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Telefone</th>
+                  <th>Peças</th>
+                  <th>Acção</th>
+                </tr>
+              </thead>
+              <tbody id="elegiveisTable">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    initSupabase();
+    if (!Auth.requireAuth()) throw new Error("Não autenticado");
+
+    async function renderStats() {
+      const s = await Storage.getStats();
+      document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-card">
+          <div class="label">Clientes Registados</div>
+          <div class="value primary">${s.totalClientes}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Clientes Elegíveis</div>
+          <div class="value success">${s.clientesElegiveis}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Sorteios Realizados</div>
+          <div class="value info">${s.sorteiosRealizados}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Prémios Pendentes</div>
+          <div class="value warning">${s.premiosPendentes}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Prémios Entregues</div>
+          <div class="value success">${s.premiosEntregues}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Total de Peças</div>
+          <div class="value">${s.totalPecas}</div>
+        </div>
+      `;
+    }
+
+    async function renderUltimosSorteios() {
+      const sorteios = (await Storage.getSorteios()).slice(0, 5);
+      const tbody = document.getElementById('ultimosSorteios');
+      if (sorteios.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum sorteio realizado</td></tr>';
+        return;
+      }
+      tbody.innerHTML = sorteios.map(s => `
+        <tr>
+          <td>${App.escapeHtml(s.clienteNome)}</td>
+          <td>${App.escapeHtml(s.premioNome)}</td>
+          <td><code>${s.codigo}</code></td>
+          <td>${App.formatDateTime(s.dataSorteio)}</td>
+          <td>
+            <span class="badge ${s.estado === 'entregue' ? 'badge-success' : 'badge-warning'}">
+              ${s.estado === 'entregue' ? 'Entregue' : 'Pendente'}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function renderElegiveis() {
+      const elegiveis = (await Storage.getClientesElegiveis()).slice(0, 5);
+      const tbody = document.getElementById('elegiveisTable');
+      if (elegiveis.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum cliente elegível de momento</td></tr>';
+        return;
+      }
+      tbody.innerHTML = elegiveis.map(c => `
+        <tr>
+          <td>${App.escapeHtml(c.nome)}</td>
+          <td>${App.escapeHtml(c.telefone)}</td>
+          <td>${c.totalPecas || 0}</td>
+          <td>
+            ${c.token && !c.tokenUsado
+              ? `<span class="badge badge-info">Link gerado</span>`
+              : `<a href="elegiveis.html" class="btn btn-primary btn-sm">Gerar Link</a>`
+            }
+          </td>
+        </tr>
+      `).join('');
+    }
+
+
+    async function exportarExcel() {
+      try {
+        if (typeof XLSX === 'undefined') {
+          App.toast('Biblioteca Excel não carregou. Verifique a internet.', 'error');
+          return;
+        }
+        const clientes = await Storage.getClientes();
+        if (!clientes.length) {
+          App.toast('Não há clientes para descarregar', 'warning');
+          return;
+        }
+        // Mesmo estilo da planilha da loja
+        const rows = [
+          ['Nome do Cliente', '1ª Compra', '2ª Compra', '3ª Compra', '4ª Compra', '5ª Compra', 'Total Peças', 'Contacto', 'Grupo WhatsApp', 'Elegível', 'Código', 'Estado']
+        ];
+        clientes.forEach(c => {
+          const n = c.totalPecas || 0;
+          const checks = [];
+          for (let i = 1; i <= 5; i++) {
+            checks.push(i <= n ? '✅' : '');
+          }
+          rows.push([
+            c.nome || '',
+            checks[0], checks[1], checks[2], checks[3], checks[4],
+            n,
+            c.telefone || '',
+            c.noGrupoWhatsapp ? 'Sim' : 'Não',
+            c.elegivel ? 'Sim' : 'Não',
+            c.codigoCliente || '',
+            c.estado || 'activo'
+          ]);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = [
+          { wch: 22 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+          { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 10 }
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+        XLSX.writeFile(wb, 'base-dados-clientes-bonus-loja.xlsx');
+        App.toast('Excel descarregado!', 'success');
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro ao exportar Excel: ' + (e.message || e), 'error');
+      }
+    }
+
+    async function exportarCSV() {
+      // mantido por compatibilidade — redireciona para Excel
+      return exportarExcel();
+    }
+
+    function contagemPecasDeLinha(row) {
+      // row = object or array from sheet
+      let n = 0;
+      const keys = Object.keys(row);
+      for (const k of keys) {
+        const kl = String(k).toLowerCase();
+        const v = row[k];
+        if (v == null) continue;
+        const s = String(v);
+        if ((kl.includes('compra') || kl.includes('1ª') || kl.includes('2ª') || kl.includes('3') || kl.includes('4') || kl.includes('5')) && (s.includes('✅') || s.includes('✔'))) {
+          n++;
+        }
+      }
+      if (n > 0) return n;
+      // total pecas column
+      for (const k of keys) {
+        const kl = String(k).toLowerCase();
+        if (kl.includes('total') || kl.includes('peças') || kl.includes('pecas')) {
+          const num = parseInt(row[k], 10);
+          if (!isNaN(num)) return num;
+        }
+      }
+      // count any checkmarks in values
+      for (const k of keys) {
+        const s = String(row[k] || '');
+        if (s.includes('✅') || s.includes('✔')) n++;
+      }
+      return n;
+    }
+
+    async function importarExcelBuffer(data) {
+      const wb = XLSX.read(data, { type: 'array', codepage: 65001, cellText: true, raw: false });
+      const sheetName = wb.SheetNames[0];
+      const sheet = wb.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      if (!json.length) throw new Error('Planilha vazia');
+
+      let importados = 0;
+      const existentes = await Storage.getClientes();
+
+      for (const row of json) {
+        // Find name
+        let nome = '';
+        let telefone = '';
+        for (const k of Object.keys(row)) {
+          const kl = String(k).toLowerCase();
+          if (!nome && (kl.includes('nome') || kl.includes('cliente'))) nome = String(row[k]).trim();
+          if (!telefone && (kl.includes('contacto') || kl.includes('contato') || kl.includes('telefone') || kl.includes('phone'))) {
+            telefone = String(row[k]).replace(/\D/g, '');
+          }
+        }
+        if (!nome) {
+          // first column fallback
+          const firstKey = Object.keys(row)[0];
+          nome = String(row[firstKey] || '').trim();
+        }
+        if (!nome) continue;
+        const nl = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        // Parar na secção de stock / controlo de peças
+        if (nl === 'pecas' || nl === 'blusas' || nl.startsWith('controle') || nl.startsWith('controlo')) break;
+        const ignorar = ['nome do cliente','pecas','blusas','calcas','casacos','blusoes','bodes','total','valor total','valor pago'];
+        if (ignorar.includes(nl)) continue;
+        if (!/[a-zA-Z]/.test(nl)) continue;
+
+        if (telefone && telefone.length < 8) telefone = '';
+        const pecas = contagemPecasDeLinha(row);
+        let noGrupo = true;
+        for (const k of Object.keys(row)) {
+          if (String(k).toLowerCase().includes('grupo') || String(k).toLowerCase().includes('whatsapp')) {
+            const v = String(row[k]).toLowerCase();
+            noGrupo = ['sim', 'yes', 'true', '1', '✅'].includes(v) || v === '';
+          }
+        }
+
+        const jaExiste = existentes.find(x =>
+          (telefone && (x.telefone || '').replace(/\D/g, '') === telefone) ||
+          x.nome.toLowerCase() === nome.toLowerCase()
+        );
+        if (jaExiste) {
+          if (pecas > (jaExiste.totalPecas || 0)) {
+            await Storage.addCompra({
+              clienteId: jaExiste.id,
+              numeroFactura: 'XLS-UPD',
+              quantidadePecas: pecas - (jaExiste.totalPecas || 0),
+              valor: 0,
+              observacao: 'Actualizado por importação Excel'
+            });
+          }
+          continue;
+        }
+
+        const cliente = await Storage.addCliente({
+          nome,
+          telefone,
+          codigoCliente: 'XLS' + String(importados + 1).padStart(3, '0'),
+          noGrupoWhatsapp: noGrupo
+        });
+        if (pecas > 0) {
+          await Storage.addCompra({
+            clienteId: cliente.id,
+            numeroFactura: 'XLS-' + (importados + 1),
+            quantidadePecas: pecas,
+            valor: 0,
+            observacao: 'Importado de Excel'
+          });
+        }
+        importados++;
+        existentes.push({ ...cliente, nome, telefone });
+      }
+
+      const elegiveis = (await Storage.getClientes()).filter(c => c.elegivel).length;
+      return { msg: 'Excel importado para o Supabase!', clientes: importados, elegiveis };
+    }
+
+    async function importarParaSupabase(file) {
+      if (!file) return;
+      const nome = (file.name || '').toLowerCase();
+      try {
+        App.toast('A importar para o Supabase...', 'info');
+        let result;
+        if (nome.endsWith('.xlsx') || nome.endsWith('.xls')) {
+          if (typeof XLSX === 'undefined') throw new Error('Biblioteca Excel não carregou');
+          const buf = await file.arrayBuffer();
+          result = await importarExcelBuffer(buf);
+        } else {
+          const textContent = await file.text();
+          result = await Storage.importFromCSV(textContent);
+        }
+        App.toast(`${result.msg} (${result.clientes} novos, ${result.elegiveis} elegíveis)`, 'success', 6000);
+        await renderAll();
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro na importação: ' + (e.message || e), 'error');
+      }
+    }
+
+    async function importarFicheiro(event) {
+      const file = event.target.files && event.target.files[0];
+      await importarParaSupabase(file);
+      event.target.value = '';
+    }
+
+
+    async function reimportarLimpo() {
+      if (!App.confirm('Isto APAGA os clientes actuais (incluindo erros como Blusas/Total) e carrega a lista correcta da loja. Continuar?')) return;
+      try {
+        App.toast('A limpar e a importar para o Supabase...', 'info');
+        const result = await Storage.limparEReimportarLoja();
+        App.toast(`${result.msg} (${result.total || result.clientes} clientes, ${result.elegiveis} elegíveis)`, 'success', 6000);
+        await renderAll();
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro: ' + (e.message || e), 'error');
+      }
+    }
+
+    async function seedDemo() {
+      if (!App.confirm('Importar os clientes do Excel para o Supabase?')) return;
+      try {
+        const result = await Storage.seedDemo();
+        App.toast(`${result.msg} (${result.clientes} clientes, ${result.elegiveis} elegíveis)`, 'success', 5000);
+        await renderAll();
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro ao importar: ' + (e.message || e), 'error');
+      }
+    }
+
+    async function renderAll() {
+      await renderStats();
+      await renderUltimosSorteios();
+      await renderElegiveis();
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>

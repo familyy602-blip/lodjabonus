@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+
+  <script>
+    /* Base path automático para GitHub Pages (repo em subpasta) */
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prémios — Bónus Lodja - Compre e ganhe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">B</div>
+        <div><h1>Bónus Lodja - Compre e ganhe</h1><span>Painel Admin</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="clientes.html" class="nav-item"><span class="icon">👥</span> Clientes</a>
+        <a href="compras.html" class="nav-item"><span class="icon">🛒</span> Compras</a>
+        <a href="elegiveis.html" class="nav-item"><span class="icon">⭐</span> Elegíveis</a>
+        <a href="sorteios.html" class="nav-item"><span class="icon">🎡</span> Sorteios</a>
+        <a href="premios.html" class="nav-item active"><span class="icon">🎁</span> Prémios</a>
+        <a href="entregas.html" class="nav-item"><span class="icon">📦</span> Entregas</a>
+        <a href="relatorios.html" class="nav-item"><span class="icon">📈</span> Relatórios</a>
+        <a href="configuracoes.html" class="nav-item"><span class="icon">⚙️</span> Configurações</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" onclick="Auth.logout()"><span class="icon">🚪</span> Sair</button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay"></div>
+
+    <div class="main-content">
+      <header class="topbar">
+        <div class="d-flex align-center gap-2">
+          <button class="menu-toggle">☰</button>
+          <h2>Prémios da Roleta</h2>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="alert alert-info">
+          Configure os prémios e as suas probabilidades. A soma das probabilidades dos prémios activos deve ser 100% para distribuição correcta.
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Lista de Prémios</h3>
+            <span id="somaProb" class="badge badge-primary"></span>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Prémio</th>
+                  <th>Descrição</th>
+                  <th>Probabilidade (%)</th>
+                  <th>Cor</th>
+                  <th>Estado</th>
+                  <th>Acções</th>
+                </tr>
+              </thead>
+              <tbody id="tabela"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Editar -->
+  <div class="modal-overlay" id="modalPremio">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Editar Prémio</h3>
+        <button class="btn btn-outline btn-sm" onclick="App.closeModal('modalPremio')">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="premioId">
+        <div class="form-group">
+          <label>Nome</label>
+          <input type="text" id="premioNome" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <textarea id="premioDesc" class="form-control"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Probabilidade (%)</label>
+            <input type="number" id="premioProb" class="form-control" min="0" max="100" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>Cor</label>
+            <input type="color" id="premioCor" class="form-control" style="height:42px;padding:4px">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <select id="premioActivo" class="form-control">
+            <option value="true">Activo</option>
+            <option value="false">Inactivo</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="App.closeModal('modalPremio')">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarPremio()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    initSupabase();
+    if (!Auth.requireAuth()) throw new Error("Não autenticado");
+
+    async function render() {
+      const premios = await Storage.getPremios();
+      const soma = premios.filter(p => p.activo).reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0);
+      document.getElementById('somaProb').textContent = `Soma probabilidades activas: ${soma.toFixed(1)}%`;
+      document.getElementById('somaProb').className = `badge ${Math.abs(soma - 100) < 0.5 ? 'badge-success' : 'badge-warning'}`;
+      document.getElementById('tabela').innerHTML = premios.map(p => `
+        <tr>
+          <td><strong>${App.escapeHtml(p.nome)}</strong></td>
+          <td>${App.escapeHtml(p.descricao || '')}</td>
+          <td>${p.probabilidade}%</td>
+          <td><span style="display:inline-block;width:24px;height:24px;border-radius:6px;background:${p.cor}"></span></td>
+          <td><span class="badge ${p.activo ? 'badge-success' : 'badge-muted'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
+          <td><button class="btn btn-outline btn-sm" onclick="editar('${p.id}')">Editar</button></td>
+        </tr>`).join('');
+    }
+
+    async function editar(id) {
+      const premios = await Storage.getPremios();
+      const p = premios.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('premioId').value = p.id;
+      document.getElementById('premioNome').value = p.nome;
+      document.getElementById('premioDesc').value = p.descricao || '';
+      document.getElementById('premioProb').value = p.probabilidade;
+      document.getElementById('premioCor').value = p.cor || '#6366f1';
+      document.getElementById('premioActivo').value = p.activo ? 'true' : 'false';
+      App.openModal('modalPremio');
+    }
+
+    async function salvarPremio() {
+      const id = document.getElementById('premioId').value;
+      try {
+        await Storage.updatePremio(id, {
+          nome: document.getElementById('premioNome').value.trim(),
+          descricao: document.getElementById('premioDesc').value.trim(),
+          probabilidade: parseFloat(document.getElementById('premioProb').value) || 0,
+          cor: document.getElementById('premioCor').value,
+          activo: document.getElementById('premioActivo').value === 'true'
+        });
+        App.toast('Prémio actualizado no Supabase!', 'success');
+        App.closeModal('modalPremio');
+        await render();
+      } catch (e) {
+        App.toast('Erro: ' + (e.message || e), 'error');
+      }
+    }
+
+    render();
+  </script>
+</body>
+</html>

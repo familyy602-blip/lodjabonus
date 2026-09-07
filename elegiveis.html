@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+
+  <script>
+    /* Base path automático para GitHub Pages (repo em subpasta) */
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clientes Elegíveis — Bónus Lodja - Compre e ganhe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">B</div>
+        <div><h1>Bónus Lodja - Compre e ganhe</h1><span>Painel Admin</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="clientes.html" class="nav-item"><span class="icon">👥</span> Clientes</a>
+        <a href="compras.html" class="nav-item"><span class="icon">🛒</span> Compras</a>
+        <a href="elegiveis.html" class="nav-item active"><span class="icon">⭐</span> Elegíveis</a>
+        <a href="sorteios.html" class="nav-item"><span class="icon">🎡</span> Sorteios</a>
+        <a href="premios.html" class="nav-item"><span class="icon">🎁</span> Prémios</a>
+        <a href="entregas.html" class="nav-item"><span class="icon">📦</span> Entregas</a>
+        <a href="relatorios.html" class="nav-item"><span class="icon">📈</span> Relatórios</a>
+        <a href="configuracoes.html" class="nav-item"><span class="icon">⚙️</span> Configurações</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" onclick="Auth.logout()"><span class="icon">🚪</span> Sair</button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay"></div>
+
+    <div class="main-content">
+      <header class="topbar">
+        <div class="d-flex align-center gap-2">
+          <button class="menu-toggle">☰</button>
+          <h2>Clientes Elegíveis</h2>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="alert alert-info">
+          Clientes que cumpriram as 3 condições: registado + grupo WhatsApp + ≥ 5 peças. Pode gerar link exclusivo ou usar o link geral do grupo.
+        </div>
+
+        <!-- LINK GERAL PARA O GRUPO -->
+        <div class="card mb-3">
+          <div class="card-header">
+            <h3>📢 Link Geral (para enviar no grupo WhatsApp)</h3>
+          </div>
+          <div class="card-body" style="padding:20px">
+            <p class="text-muted" style="margin-bottom:12px">
+              Envie este link no grupo. Cada pessoa coloca o nome ou número. Só quem estiver na base de dados e tiver 5+ peças consegue girar a roleta.
+            </p>
+            <div class="d-flex gap-2 flex-wrap align-center">
+              <input type="text" id="linkGeral" class="form-control" readonly style="max-width:420px">
+              <button class="btn btn-primary btn-sm" onclick="copiarLinkGeral()">📋 Copiar</button>
+              <button class="btn btn-success btn-sm" onclick="abrirLinkGeral()">🎡 Abrir</button>
+              <button class="btn btn-outline btn-sm" onclick="partilharLinkGeralWA()">💬 WhatsApp</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Lista de Elegíveis (links exclusivos)</h3>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Telefone</th>
+                  <th>Peças</th>
+                  <th>Token / Link</th>
+                  <th>Estado</th>
+                  <th>Acções</th>
+                </tr>
+              </thead>
+              <tbody id="tabela"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Link Gerado -->
+  <div class="modal-overlay" id="modalLink">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Link de Sorteio Gerado</h3>
+        <button class="btn btn-outline btn-sm" onclick="App.closeModal('modalLink')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p><strong>Cliente:</strong> <span id="linkClienteNome"></span></p>
+        <p class="mt-2"><strong>Token:</strong> <code id="linkToken"></code></p>
+        <div class="form-group mt-2">
+          <label>Link completo</label>
+          <input type="text" id="linkUrl" class="form-control" readonly>
+        </div>
+        <div class="d-flex gap-2 flex-wrap mt-2">
+          <button class="btn btn-primary" onclick="copiarLink()">📋 Copiar Link</button>
+          <button class="btn btn-success" onclick="abrirRoleta()">🎡 Abrir Roleta</button>
+          <button class="btn btn-outline" onclick="partilharWA()">💬 Partilhar WhatsApp</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    initSupabase();
+    if (!Auth.requireAuth()) throw new Error("Não autenticado");
+
+    let currentToken = null;
+    let currentNome = null;
+
+    async function render() {
+      const clientes = (await Storage.getClientes()).filter(c => c.elegivel);
+      const tbody = document.getElementById('tabela');
+      if (clientes.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="icon">⭐</div><h4>Nenhum cliente elegível</h4><p>Importe a base no Dashboard ou registe compras até 5 peças</p></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = clientes.map(c => {
+        let estadoBadge, accoes;
+        if (c.tokenUsado) {
+          estadoBadge = '<span class="badge badge-info">Sorteio realizado</span>';
+          accoes = `<a href="sorteios.html" class="btn btn-outline btn-sm">Ver resultado</a>
+            <button class="btn btn-success btn-sm" onclick="testarRoleta('${c.id}')">Testar</button>`;
+        } else if (c.token) {
+          estadoBadge = '<span class="badge badge-warning">Link gerado</span>';
+          accoes = `
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-primary btn-sm" onclick="mostrarLink('${c.id}')">Ver Link</button>
+              <button class="btn btn-success btn-sm" onclick="abrirRoletaToken('${c.token}')">🎡 Abrir</button>
+              <button class="btn btn-outline btn-sm" onclick="gerarNovoLink('${c.id}')">Novo Token</button>
+            </div>`;
+        } else {
+          estadoBadge = '<span class="badge badge-success">Pronto</span>';
+          accoes = `<button class="btn btn-primary btn-sm" onclick="gerarLink('${c.id}')">🎁 Gerar Link</button>`;
+        }
+        return `
+          <tr>
+            <td><strong>${App.escapeHtml(c.nome)}</strong></td>
+            <td>${App.escapeHtml(c.telefone)}</td>
+            <td>${c.totalPecas || 0}</td>
+            <td>${c.token ? `<code style="font-size:11px">${c.token}</code>` : '—'}</td>
+            <td>${estadoBadge}</td>
+            <td>${accoes}</td>
+          </tr>`;
+      }).join('');
+    }
+
+    async function gerarLink(clienteId) {
+      try {
+        const token = await Storage.gerarLink(clienteId);
+        if (!token) { App.toast('Não foi possível gerar o link', 'error'); return; }
+        App.toast('Link gerado!', 'success');
+        await render();
+        await mostrarLink(clienteId);
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro: ' + (e.message || e), 'error');
+      }
+    }
+
+    async function gerarNovoLink(clienteId) {
+      if (!App.confirm('Gerar novo token?')) return;
+      await Storage.updateCliente(clienteId, { token: null, tokenUsado: false });
+      await gerarLink(clienteId);
+    }
+
+    async function mostrarLink(clienteId) {
+      const c = await Storage.getClienteById(clienteId);
+      if (!c || !c.token) return;
+      currentToken = c.token;
+      currentNome = c.nome;
+      document.getElementById('linkClienteNome').textContent = c.nome;
+      document.getElementById('linkToken').textContent = c.token;
+      document.getElementById('linkUrl').value = App.getRoletaUrl(c.token);
+      App.openModal('modalLink');
+    }
+
+    function copiarLink() { App.copyToClipboard(document.getElementById('linkUrl').value); }
+    function abrirRoleta() { window.open(App.getRoletaUrl(currentToken), '_blank'); }
+    function abrirRoletaToken(token) { window.open(App.getRoletaUrl(token), '_blank'); }
+    function partilharWA() { App.shareWhatsApp(currentToken, currentNome); }
+
+    async function testarRoleta(clienteId) {
+      // Reabrir sorteio para teste: novo token
+      if (!App.confirm('Gerar novo link de teste para este cliente?')) return;
+      await Storage.updateCliente(clienteId, { token: null, tokenUsado: false, ultimoPremio: null, ultimoCodigo: null });
+      // Apagar sorteios antigos deste cliente (opcional - só marca novo token)
+      const token = await Storage.gerarLink(clienteId);
+      if (token) window.open(App.getRoletaUrl(token), '_blank');
+      await render();
+    }
+
+    function getLinkGeral() {
+      const base = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
+      return base + 'roleta.html';
+    }
+    function initLinkGeral() {
+      const input = document.getElementById('linkGeral');
+      if (input) input.value = getLinkGeral();
+    }
+    function copiarLinkGeral() { App.copyToClipboard(getLinkGeral()); }
+    function abrirLinkGeral() { window.open(getLinkGeral(), '_blank'); }
+    function partilharLinkGeralWA() {
+      const url = getLinkGeral();
+      const text = encodeURIComponent('🎡 *Bónus Lodja - Compre e ganhe – Roleta*\\n\\nClientes com 5+ peças: abra o link, coloque o número e gire:\\n' + url);
+      window.open('https://wa.me/?text=' + text, '_blank');
+    }
+
+    initLinkGeral();
+    render();
+  </script>
+</body>
+</html>

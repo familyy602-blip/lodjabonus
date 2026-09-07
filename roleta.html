@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+
+  <script>
+    /* Base path automático para GitHub Pages (repo em subpasta) */
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roleta de Prémios — Bónus Lodja - Compre e ganhe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/roleta.css">
+  <style>
+    .acesso-form {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 28px 24px;
+      max-width: 400px;
+      margin: 0 auto;
+      text-align: left;
+    }
+    .acesso-form h2 {
+      text-align: center;
+      font-size: 20px;
+      margin-bottom: 8px;
+      color: #f1f5f9;
+    }
+    .acesso-form .desc {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .acesso-form .form-group {
+      margin-bottom: 16px;
+    }
+    .acesso-form label {
+      display: block;
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+    .acesso-form input {
+      width: 100%;
+      padding: 12px 14px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: #f1f5f9;
+      font-size: 15px;
+      font-family: inherit;
+    }
+    .acesso-form input:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.25);
+    }
+    .acesso-form .btn-verificar {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .acesso-form .btn-verificar:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(99,102,241,0.4);
+    }
+    .acesso-form .erro-msg {
+      background: rgba(239,68,68,0.15);
+      color: #f87171;
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+      margin-bottom: 16px;
+      text-align: center;
+      display: none;
+    }
+    .acesso-form .erro-msg.show { display: block; }
+    .ou-divisor {
+      text-align: center;
+      color: #64748b;
+      font-size: 13px;
+      margin: 20px 0 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="roleta-page">
+    <div class="roleta-container" id="app">
+      <!-- Conteúdo dinâmico -->
+    </div>
+    <div class="roleta-footer" id="roletaFooter">
+      <div style="margin-bottom:10px">Bónus Lodja - Compre e ganhe · Sorteio de clientes fiéis</div>
+      <a href="dashboard.html" id="btnVoltarPainel" style="display:inline-block;color:#a5b4fc;font-size:14px;text-decoration:none;font-weight:600">← Voltar ao painel admin</a>
+    </div>
+  </div>
+
+  <div class="confetti-container" id="confetti"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    initSupabase();
+
+    // Admin: mostrar botão voltar ao painel
+    (function showAdminBack() {
+      try {
+        const btn = document.getElementById('btnVoltarPainel');
+        if (!btn) return;
+        if (sessionStorage.getItem('admin_logged') === 'true') {
+          btn.textContent = '← Voltar ao painel admin';
+          btn.href = 'dashboard.html';
+        } else {
+          btn.textContent = 'Área admin';
+          btn.href = 'login.html';
+        }
+        btn.style.display = 'inline-block';
+      } catch (e) {}
+    })();
+
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const app = document.getElementById('app');
+
+    // ========== MODO 1: Link exclusivo com token ==========
+    if (token) {
+      initRoletaPorToken(token);
+    } else {
+      // ========== MODO 2: Acesso público (grupo WhatsApp) ==========
+      mostrarFormularioAcesso();
+    }
+
+    // -------------------------------------------------------
+    // FORMULÁRIO DE ACESSO (link geral para o grupo)
+    // -------------------------------------------------------
+    function mostrarFormularioAcesso() {
+      app.innerHTML = `
+        <div class="roleta-header">
+          <div class="badge-loja">Bónus Lodja - Compre e ganhe</div>
+          <h1>Roleta de Prémios</h1>
+          <p class="subtitulo">Para clientes que já compraram 5 ou mais peças</p>
+        </div>
+
+        <div class="acesso-form">
+          <h2>Verificar acesso</h2>
+          <p class="desc">Introduza o seu nome ou número de telefone para verificar se pode participar.</p>
+
+          <div class="erro-msg" id="erroAcesso"></div>
+
+          <div class="form-group">
+            <label>Nome completo (opcional)</label>
+            <input type="text" id="inputNome" placeholder="Ex: Maria Silva" autocomplete="name">
+          </div>
+          <div class="form-group">
+            <label>Número de telefone *</label>
+            <input type="tel" id="inputTelefone" placeholder="Ex: 84XXXXXXX" autocomplete="tel" required>
+          </div>
+
+          <button class="btn-verificar" id="btnVerificar">Verificar e Continuar</button>
+        </div>
+      `;
+
+      document.getElementById('btnVerificar').addEventListener('click', verificarAcesso);
+      document.getElementById('inputTelefone').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verificarAcesso();
+      });
+    }
+
+    function normalizarTelefone(tel) {
+      return (tel || '').replace(/\D/g, ''); // só dígitos
+    }
+
+    async function verificarAcesso() {
+      const nome = (document.getElementById('inputNome').value || '').trim().toLowerCase();
+      const telefoneRaw = document.getElementById('inputTelefone').value.trim();
+      const telefone = normalizarTelefone(telefoneRaw);
+      const erroEl = document.getElementById('erroAcesso');
+
+      erroEl.classList.remove('show');
+      erroEl.textContent = '';
+
+      if (!telefone || telefone.length < 8) {
+        erroEl.textContent = 'Introduza um número de telefone válido.';
+        erroEl.classList.add('show');
+        return;
+      }
+
+      const clientes = await Storage.getClientes();
+
+      // Procurar por telefone (prioridade) ou por nome
+      let cliente = clientes.find(c => normalizarTelefone(c.telefone) === telefone);
+
+      if (!cliente && nome) {
+        cliente = clientes.find(c => (c.nome || '').toLowerCase().includes(nome) || nome.includes((c.nome || '').toLowerCase()));
+      }
+
+      if (!cliente) {
+        erroEl.textContent = 'Não encontramos o seu registo. Confirme o número ou fale com a loja.';
+        erroEl.classList.add('show');
+        return;
+      }
+
+      // Verificar se já fez o sorteio
+      if (cliente.tokenUsado) {
+        const sorteios = await Storage.getSorteios();
+        const sorteio = sorteios.find(s => s.clienteId === cliente.id);
+        mostrarJaParticipou(cliente, sorteio);
+        return;
+      }
+
+      // Verificar elegibilidade (5+ peças + grupo)
+      if (!cliente.elegivel) {
+        const pecas = cliente.totalPecas || 0;
+        if (pecas < 5) {
+          erroEl.textContent = `Ainda não atingiu as 5 peças (tem ${pecas}). Continue a comprar!`;
+        } else if (!cliente.noGrupoWhatsapp) {
+          erroEl.textContent = 'É necessário estar no grupo oficial do WhatsApp da loja.';
+        } else {
+          erroEl.textContent = 'Ainda não é elegível. Fale com a loja.';
+        }
+        erroEl.classList.add('show');
+        return;
+      }
+
+      // Tudo ok → gerar token temporário se não tiver e mostrar roleta
+      if (!cliente.token) {
+        const novoToken = await Storage.gerarLink(cliente.id);
+        if (!novoToken) {
+          erroEl.textContent = 'Erro ao preparar o sorteio. Tente novamente.';
+          erroEl.classList.add('show');
+          return;
+        }
+        cliente = await Storage.getClienteById(cliente.id); // actualizar
+      }
+
+      renderRoleta(cliente, cliente.token);
+    }
+
+    // -------------------------------------------------------
+    // MODO TOKEN EXCLUSIVO
+    // -------------------------------------------------------
+    async function initRoletaPorToken(token) {
+      const cliente = await Storage.getClienteByToken(token);
+      const sorteioExistente = await Storage.getSorteioByToken(token);
+
+      if (!cliente) {
+        app.innerHTML = `
+          <div class="estado-erro">
+            <div class="icon">❌</div>
+            <h2>Link inválido</h2>
+            <p>Este link não está associado a nenhum cliente.</p>
+          </div>`;
+        return;
+      }
+
+      if (cliente.tokenUsado || sorteioExistente) {
+        mostrarJaParticipou(cliente, sorteioExistente);
+        return;
+      }
+
+      renderRoleta(cliente, token);
+    }
+
+    function mostrarJaParticipou(cliente, sorteio) {
+      const s = sorteio || {};
+      app.innerHTML = `
+        <div class="roleta-header">
+          <div class="badge-loja">Bónus Lodja - Compre e ganhe</div>
+          <h1>Sorteio já realizado</h1>
+          <div class="cliente-nome">${App.escapeHtml(cliente.nome)}</div>
+        </div>
+        <div class="resultado-box ganhou">
+          <h2>🎉 Já participou!</h2>
+          <p class="premio-nome">${App.escapeHtml(s.premioNome || cliente.ultimoPremio || '—')}</p>
+          <div class="codigo">${s.codigo || cliente.ultimoCodigo || '—'}</div>
+          <p class="aviso">Guarde este código e apresente-o na loja para receber o seu prémio.</p>
+          <p class="aviso mt-1">Data: ${App.formatDateTime(s.dataSorteio || cliente.dataSorteio)}</p>
+        </div>`;
+    }
+
+    // -------------------------------------------------------
+    // ROLETA (comum aos dois modos)
+    // -------------------------------------------------------
+    async function renderRoleta(cliente, token) {
+      const premios = (await Storage.getPremios()).filter(p => p.activo);
+
+      app.innerHTML = `
+        <div class="roleta-header">
+          <div class="badge-loja">Bónus Lodja - Compre e ganhe</div>
+          <h1>Parabéns!</h1>
+          <div class="cliente-nome">${App.escapeHtml(cliente.nome)}</div>
+          <p class="subtitulo">Você cumpriu as condições e pode girar a roleta uma vez.</p>
+        </div>
+
+        <div class="wheel-wrapper">
+          <div class="wheel-pointer"></div>
+          <div class="wheel" id="wheel"></div>
+          <div class="wheel-center">★</div>
+        </div>
+
+        <button class="btn-girar" id="btnGirar">GIRAR A ROLETA</button>
+        <div id="resultadoArea"></div>
+      `;
+
+      drawWheel(premios);
+      document.getElementById('btnGirar').addEventListener('click', () => girar(token, premios));
+    }
+
+    function drawWheel(premios) {
+      const wheel = document.getElementById('wheel');
+      if (!premios.length) return;
+
+      const total = premios.reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0);
+      let current = 0;
+      const colors = premios.map(p => p.cor || '#6366f1');
+      let gradientParts = [];
+
+      premios.forEach((p, i) => {
+        const pct = ((parseFloat(p.probabilidade) || 0) / total) * 100;
+        const start = current;
+        const end = current + pct;
+        gradientParts.push(`${colors[i]} ${start}% ${end}%`);
+        current = end;
+      });
+
+      wheel.style.background = `conic-gradient(from -90deg, ${gradientParts.join(', ')})`;
+    }
+
+    async function girar(token, premios) {
+      const btn = document.getElementById('btnGirar');
+      btn.disabled = true;
+      btn.textContent = 'A girar...';
+
+      // Resultado determinado ANTES da animação
+      const resultado = await Storage.realizarSorteio(token);
+
+      if (resultado.erro) {
+        alert(resultado.erro);
+        btn.disabled = false;
+        btn.textContent = 'GIRAR A ROLETA';
+        return;
+      }
+
+      const { sorteio, premio } = resultado;
+
+      const total = premios.reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0);
+      let acumulado = 0;
+      let anguloAlvo = 0;
+      const idx = premios.findIndex(p => p.id === premio.id);
+
+      for (let i = 0; i < premios.length; i++) {
+        const slice = ((parseFloat(premios[i].probabilidade) || 0) / total) * 360;
+        if (i === idx) {
+          anguloAlvo = acumulado + slice / 2;
+          break;
+        }
+        acumulado += slice;
+      }
+
+      const voltas = 5 + Math.random() * 2;
+      const rotacaoFinal = (voltas * 360) + (360 - anguloAlvo);
+
+      const wheel = document.getElementById('wheel');
+      wheel.classList.add('spinning');
+      wheel.style.transform = `rotate(${rotacaoFinal}deg)`;
+
+      setTimeout(() => {
+        mostrarResultado(sorteio, premio);
+        lancarConfetti();
+      }, 5200);
+    }
+
+    function mostrarResultado(sorteio, premio) {
+      document.getElementById('resultadoArea').innerHTML = `
+        <div class="resultado-box ganhou">
+          <h2>🎉 Parabéns, ganhou!</h2>
+          <p class="premio-nome">${App.escapeHtml(premio.nome)}</p>
+          <p style="color:#94a3b8;font-size:14px">${App.escapeHtml(premio.descricao || '')}</p>
+          <div class="codigo">${sorteio.codigo}</div>
+          <p class="aviso">Guarde este código e apresente-o na loja para receber o seu prémio.</p>
+          <p class="aviso">Este sorteio já não pode ser repetido.</p>
+        </div>
+      `;
+      document.getElementById('btnGirar').textContent = 'Sorteio realizado';
+    }
+
+    function lancarConfetti() {
+      const container = document.getElementById('confetti');
+      const cores = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6', '#fbbf24'];
+      for (let i = 0; i < 80; i++) {
+        const el = document.createElement('div');
+        el.className = 'confetti';
+        el.style.left = Math.random() * 100 + '%';
+        el.style.background = cores[Math.floor(Math.random() * cores.length)];
+        el.style.width = (6 + Math.random() * 8) + 'px';
+        el.style.height = (6 + Math.random() * 8) + 'px';
+        el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        el.style.animationDelay = (Math.random() * 0.5) + 's';
+        el.style.animationDuration = (2.5 + Math.random() * 2) + 's';
+        container.appendChild(el);
+      }
+      setTimeout(() => { container.innerHTML = ''; }, 5000);
+    }
+  </script>
+</body>
+</html>

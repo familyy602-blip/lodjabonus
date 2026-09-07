@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+
+  <script>
+    /* Base path automático para GitHub Pages (repo em subpasta) */
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compras — Bónus Lodja - Compre e ganhe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">B</div>
+        <div><h1>Bónus Lodja - Compre e ganhe</h1><span>Painel Admin</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="clientes.html" class="nav-item"><span class="icon">👥</span> Clientes</a>
+        <a href="compras.html" class="nav-item active"><span class="icon">🛒</span> Compras</a>
+        <a href="elegiveis.html" class="nav-item"><span class="icon">⭐</span> Elegíveis</a>
+        <a href="sorteios.html" class="nav-item"><span class="icon">🎡</span> Sorteios</a>
+        <a href="premios.html" class="nav-item"><span class="icon">🎁</span> Prémios</a>
+        <a href="entregas.html" class="nav-item"><span class="icon">📦</span> Entregas</a>
+        <a href="relatorios.html" class="nav-item"><span class="icon">📈</span> Relatórios</a>
+        <a href="configuracoes.html" class="nav-item"><span class="icon">⚙️</span> Configurações</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" onclick="Auth.logout()"><span class="icon">🚪</span> Sair</button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay"></div>
+
+    <div class="main-content">
+      <header class="topbar">
+        <div class="d-flex align-center gap-2">
+          <button class="menu-toggle">☰</button>
+          <h2>Compras</h2>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" onclick="openNovaCompra()">+ Nova Compra</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="card">
+          <div class="card-header">
+            <div class="search-box">
+              <input type="text" id="search" class="form-control" placeholder="Pesquisar por cliente ou factura...">
+            </div>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Cliente</th>
+                  <th>Factura</th>
+                  <th>Peças</th>
+                  <th>Valor</th>
+                  <th>Observação</th>
+                  <th>Acções</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaCompras"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Nova Compra -->
+  <div class="modal-overlay" id="modalCompra">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Nova Compra</h3>
+        <button class="btn btn-outline btn-sm" onclick="App.closeModal('modalCompra')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Cliente *</label>
+          <select id="clienteId" class="form-control" required>
+            <option value="">Seleccione o cliente...</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nº da Factura</label>
+            <input type="text" id="numeroFactura" class="form-control" placeholder="FT001">
+          </div>
+          <div class="form-group">
+            <label>Quantidade de Peças *</label>
+            <input type="number" id="quantidadePecas" class="form-control" min="1" value="1" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Valor da Compra</label>
+            <input type="number" id="valor" class="form-control" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label>Data</label>
+            <input type="date" id="data" class="form-control">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Observação</label>
+          <textarea id="observacao" class="form-control" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="App.closeModal('modalCompra')">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarCompra()">Registar Compra</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    initSupabase();
+    if (!Auth.requireAuth()) throw new Error("Não autenticado");
+
+    async function popularClientes() {
+      const select = document.getElementById('clienteId');
+      const clientes = (await Storage.getClientes()).filter(c => c.estado === 'activo');
+      select.innerHTML = '<option value="">Seleccione o cliente...</option>' +
+        clientes.map(c => `<option value="${c.id}">${App.escapeHtml(c.nome)} (${c.telefone || 's/n'})</option>`).join('');
+    }
+
+    async function render() {
+      const search = document.getElementById('search').value.toLowerCase();
+      let compras = await Storage.getCompras();
+      const clientes = await Storage.getClientes();
+      const map = Object.fromEntries(clientes.map(c => [c.id, c]));
+
+      if (search) {
+        compras = compras.filter(c => {
+          const cl = map[c.clienteId];
+          return (cl?.nome || '').toLowerCase().includes(search) ||
+                 (c.numeroFactura || '').toLowerCase().includes(search);
+        });
+      }
+
+      const tbody = document.getElementById('tabelaCompras');
+      if (compras.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">🛒</div><h4>Nenhuma compra registada</h4></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = compras.map(c => {
+        const cliente = map[c.clienteId];
+        return `
+          <tr>
+            <td>${App.formatDate(c.data)}</td>
+            <td>${App.escapeHtml(cliente?.nome || '—')}</td>
+            <td>${App.escapeHtml(c.numeroFactura || '—')}</td>
+            <td><strong>${c.quantidadePecas}</strong></td>
+            <td>${c.valor ? Number(c.valor).toLocaleString('pt-PT') + ' MZN' : '—'}</td>
+            <td>${App.escapeHtml(c.observacao || '—')}</td>
+            <td><button class="btn btn-danger btn-sm" onclick="apagarCompra('${c.id}')">Apagar</button></td>
+          </tr>`;
+      }).join('');
+    }
+
+    async function openNovaCompra() {
+      await popularClientes();
+      document.getElementById('clienteId').value = '';
+      document.getElementById('numeroFactura').value = '';
+      document.getElementById('quantidadePecas').value = 1;
+      document.getElementById('valor').value = '';
+      document.getElementById('data').value = new Date().toISOString().split('T')[0];
+      document.getElementById('observacao').value = '';
+      App.openModal('modalCompra');
+    }
+
+    async function salvarCompra() {
+      const clienteId = document.getElementById('clienteId').value;
+      const quantidadePecas = parseInt(document.getElementById('quantidadePecas').value) || 0;
+      if (!clienteId) { App.toast('Seleccione o cliente', 'error'); return; }
+      if (quantidadePecas < 1) { App.toast('Quantidade inválida', 'error'); return; }
+      try {
+        await Storage.addCompra({
+          clienteId,
+          numeroFactura: document.getElementById('numeroFactura').value.trim(),
+          quantidadePecas,
+          valor: parseFloat(document.getElementById('valor').value) || 0,
+          data: document.getElementById('data').value,
+          observacao: document.getElementById('observacao').value.trim()
+        });
+        const cliente = await Storage.getClienteById(clienteId);
+        App.toast(`Compra registada! ${cliente.nome} tem ${cliente.totalPecas} peças.`, 'success');
+        if (cliente.elegivel) App.toast(`${cliente.nome} está ELEGÍVEL!`, 'success', 4000);
+        App.closeModal('modalCompra');
+        await render();
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro: ' + (e.message || e), 'error');
+      }
+    }
+
+    async function apagarCompra(id) {
+      if (!App.confirm('Apagar esta compra?')) return;
+      try {
+        await Storage.deleteCompra(id);
+        App.toast('Compra apagada', 'success');
+        await render();
+      } catch (e) {
+        App.toast('Erro ao apagar', 'error');
+      }
+    }
+
+    document.getElementById('search').addEventListener('input', () => render());
+    render();
+  </script>
+</body>
+</html>

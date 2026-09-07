@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+
+  <script>
+    /* Base path automático para GitHub Pages (repo em subpasta) */
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clientes — Bónus Lodja - Compre e ganhe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">B</div>
+        <div><h1>Bónus Lodja - Compre e ganhe</h1><span>Painel Admin</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item" data-page="dashboard"><span class="icon">📊</span> Dashboard</a>
+        <a href="clientes.html" class="nav-item active" data-page="clientes"><span class="icon">👥</span> Clientes</a>
+        <a href="compras.html" class="nav-item" data-page="compras"><span class="icon">🛒</span> Compras</a>
+        <a href="elegiveis.html" class="nav-item" data-page="elegiveis"><span class="icon">⭐</span> Elegíveis</a>
+        <a href="sorteios.html" class="nav-item" data-page="sorteios"><span class="icon">🎡</span> Sorteios</a>
+        <a href="premios.html" class="nav-item" data-page="premios"><span class="icon">🎁</span> Prémios</a>
+        <a href="entregas.html" class="nav-item" data-page="entregas"><span class="icon">📦</span> Entregas</a>
+        <a href="relatorios.html" class="nav-item" data-page="relatorios"><span class="icon">📈</span> Relatórios</a>
+        <a href="configuracoes.html" class="nav-item" data-page="config"><span class="icon">⚙️</span> Configurações</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" onclick="Auth.logout()"><span class="icon">🚪</span> Sair</button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay"></div>
+
+    <div class="main-content">
+      <header class="topbar">
+        <div class="d-flex align-center gap-2">
+          <button class="menu-toggle">☰</button>
+          <h2>Clientes</h2>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" onclick="openNovoCliente()">+ Novo Cliente</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="card">
+          <div class="card-header">
+            <div class="search-box">
+              <input type="text" id="search" class="form-control" placeholder="Pesquisar por nome, telefone ou código...">
+            </div>
+            <div class="filters">
+              <select id="filterElegivel" class="form-control" style="width: auto;">
+                <option value="">Todos</option>
+                <option value="sim">Elegíveis</option>
+                <option value="nao">Não elegíveis</option>
+              </select>
+              <select id="filterGrupo" class="form-control" style="width: auto;">
+                <option value="">Grupo WhatsApp</option>
+                <option value="sim">No grupo</option>
+                <option value="nao">Fora do grupo</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Telefone</th>
+                  <th>Código</th>
+                  <th>Peças</th>
+                  <th>Grupo WA</th>
+                  <th>Elegível</th>
+                  <th>Sorteio</th>
+                  <th>Acções</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaClientes"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Novo/Editar Cliente -->
+  <div class="modal-overlay" id="modalCliente">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">Novo Cliente</h3>
+        <button class="btn btn-outline btn-sm" onclick="App.closeModal('modalCliente')">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="clienteId">
+        <div class="form-group">
+          <label>Nome completo *</label>
+          <input type="text" id="nome" class="form-control" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Telefone *</label>
+            <input type="text" id="telefone" class="form-control" placeholder="850000000" required>
+          </div>
+          <div class="form-group">
+            <label>Código do Cliente</label>
+            <input type="text" id="codigoCliente" class="form-control" placeholder="CLI001">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Está no grupo do WhatsApp?</label>
+            <select id="noGrupoWhatsapp" class="form-control">
+              <option value="false">Não</option>
+              <option value="true">Sim</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Estado</label>
+            <select id="estado" class="form-control">
+              <option value="activo">Activo</option>
+              <option value="inactivo">Inactivo</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="App.closeModal('modalCliente')">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarCliente()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    initSupabase();
+    if (!Auth.requireAuth()) throw new Error("Não autenticado");
+
+    let editId = null;
+
+    async function render() {
+      const search = document.getElementById('search').value.toLowerCase();
+      const filterE = document.getElementById('filterElegivel').value;
+      const filterG = document.getElementById('filterGrupo').value;
+
+      let clientes = await Storage.getClientes();
+
+      if (search) {
+        clientes = clientes.filter(c =>
+          (c.nome || '').toLowerCase().includes(search) ||
+          (c.telefone || '').includes(search) ||
+          (c.codigoCliente || '').toLowerCase().includes(search)
+        );
+      }
+      if (filterE === 'sim') clientes = clientes.filter(c => c.elegivel);
+      if (filterE === 'nao') clientes = clientes.filter(c => !c.elegivel);
+      if (filterG === 'sim') clientes = clientes.filter(c => c.noGrupoWhatsapp);
+      if (filterG === 'nao') clientes = clientes.filter(c => !c.noGrupoWhatsapp);
+
+      const tbody = document.getElementById('tabelaClientes');
+      if (clientes.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">👥</div><h4>Nenhum cliente encontrado</h4><p>Importe a base de dados no Dashboard</p></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = clientes.map(c => `
+        <tr>
+          <td><strong>${App.escapeHtml(c.nome)}</strong></td>
+          <td>${App.escapeHtml(c.telefone)}</td>
+          <td>${App.escapeHtml(c.codigoCliente || '—')}</td>
+          <td>${c.totalPecas || 0}</td>
+          <td>
+            <span class="badge ${c.noGrupoWhatsapp ? 'badge-success' : 'badge-muted'}">
+              ${c.noGrupoWhatsapp ? 'Sim' : 'Não'}
+            </span>
+          </td>
+          <td>
+            <span class="badge ${c.elegivel ? 'badge-success' : 'badge-muted'}">
+              ${c.elegivel ? 'Sim' : 'Não'}
+            </span>
+          </td>
+          <td>
+            ${c.tokenUsado
+              ? '<span class="badge badge-info">Realizado</span>'
+              : c.token
+                ? '<span class="badge badge-warning">Link gerado</span>'
+                : c.elegivel
+                  ? '<span class="badge badge-primary">Pode gerar</span>'
+                  : '—'
+            }
+          </td>
+          <td>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline btn-sm" onclick="editarCliente('${c.id}')">Editar</button>
+              <button class="btn btn-danger btn-sm" onclick="apagarCliente('${c.id}')">Apagar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openNovoCliente() {
+      editId = null;
+      document.getElementById('modalTitle').textContent = 'Novo Cliente';
+      document.getElementById('nome').value = '';
+      document.getElementById('telefone').value = '';
+      document.getElementById('codigoCliente').value = '';
+      document.getElementById('noGrupoWhatsapp').value = 'false';
+      document.getElementById('estado').value = 'activo';
+      App.openModal('modalCliente');
+    }
+
+    async function editarCliente(id) {
+      const c = await Storage.getClienteById(id);
+      if (!c) return;
+      editId = id;
+      document.getElementById('modalTitle').textContent = 'Editar Cliente';
+      document.getElementById('nome').value = c.nome || '';
+      document.getElementById('telefone').value = c.telefone || '';
+      document.getElementById('codigoCliente').value = c.codigoCliente || '';
+      document.getElementById('noGrupoWhatsapp').value = c.noGrupoWhatsapp ? 'true' : 'false';
+      document.getElementById('estado').value = c.estado || 'activo';
+      App.openModal('modalCliente');
+    }
+
+    async function salvarCliente() {
+      const nome = document.getElementById('nome').value.trim();
+      const telefone = document.getElementById('telefone').value.trim();
+      if (!nome || !telefone) {
+        App.toast('Nome e telefone são obrigatórios', 'error');
+        return;
+      }
+      const data = {
+        nome,
+        telefone,
+        codigoCliente: document.getElementById('codigoCliente').value.trim(),
+        noGrupoWhatsapp: document.getElementById('noGrupoWhatsapp').value === 'true',
+        estado: document.getElementById('estado').value
+      };
+      try {
+        if (editId) {
+          await Storage.updateCliente(editId, data);
+          App.toast('Cliente actualizado no Supabase!', 'success');
+        } else {
+          await Storage.addCliente(data);
+          App.toast('Cliente criado no Supabase!', 'success');
+        }
+        App.closeModal('modalCliente');
+        await render();
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro: ' + (e.message || e), 'error');
+      }
+    }
+
+    async function apagarCliente(id) {
+      if (!App.confirm('Apagar este cliente do Supabase?')) return;
+      try {
+        await Storage.deleteCliente(id);
+        App.toast('Cliente apagado', 'success');
+        await render();
+      } catch (e) {
+        App.toast('Erro ao apagar', 'error');
+      }
+    }
+
+    document.getElementById('search').addEventListener('input', () => render());
+    document.getElementById('filterElegivel').addEventListener('change', () => render());
+    document.getElementById('filterGrupo').addEventListener('change', () => render());
+
+    render();
+  </script>
+</body>
+</html>

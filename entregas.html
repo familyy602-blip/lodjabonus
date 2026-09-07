@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+
+  <script>
+    /* Base path automático para GitHub Pages (repo em subpasta) */
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrega de Prémios — Bónus Lodja - Compre e ganhe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">B</div>
+        <div><h1>Bónus Lodja - Compre e ganhe</h1><span>Painel Admin</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="clientes.html" class="nav-item"><span class="icon">👥</span> Clientes</a>
+        <a href="compras.html" class="nav-item"><span class="icon">🛒</span> Compras</a>
+        <a href="elegiveis.html" class="nav-item"><span class="icon">⭐</span> Elegíveis</a>
+        <a href="sorteios.html" class="nav-item"><span class="icon">🎡</span> Sorteios</a>
+        <a href="premios.html" class="nav-item"><span class="icon">🎁</span> Prémios</a>
+        <a href="entregas.html" class="nav-item active"><span class="icon">📦</span> Entregas</a>
+        <a href="relatorios.html" class="nav-item"><span class="icon">📈</span> Relatórios</a>
+        <a href="configuracoes.html" class="nav-item"><span class="icon">⚙️</span> Configurações</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" onclick="Auth.logout()"><span class="icon">🚪</span> Sair</button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay"></div>
+
+    <div class="main-content">
+      <header class="topbar">
+        <div class="d-flex align-center gap-2">
+          <button class="menu-toggle">☰</button>
+          <h2>Entrega de Prémios</h2>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="stats-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="stat-card">
+            <div class="label">Pendentes de Entrega</div>
+            <div class="value warning" id="statPendentes">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Já Entregues</div>
+            <div class="value success" id="statEntregues">0</div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h3>Prémios Pendentes</h3>
+            <div class="search-box">
+              <input type="text" id="search" class="form-control" placeholder="Pesquisar...">
+            </div>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Contacto</th>
+                  <th>Prémio</th>
+                  <th>Código</th>
+                  <th>Data Sorteio</th>
+                  <th>Acção</th>
+                </tr>
+              </thead>
+              <tbody id="tabela"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    initSupabase();
+    if (!Auth.requireAuth()) throw new Error("Não autenticado");
+
+    async function render() {
+      const stats = await Storage.getStats();
+      document.getElementById('statPendentes').textContent = stats.premiosPendentes;
+      document.getElementById('statEntregues').textContent = stats.premiosEntregues;
+
+      const search = document.getElementById('search').value.toLowerCase();
+      let sorteios = (await Storage.getSorteios()).filter(s => s.estado === 'premio_pendente');
+
+      if (search) {
+        sorteios = sorteios.filter(s =>
+          (s.clienteNome || '').toLowerCase().includes(search) ||
+          (s.clienteTelefone || '').includes(search) ||
+          (s.codigo || '').toLowerCase().includes(search)
+        );
+      }
+
+      const tbody = document.getElementById('tabela');
+      if (sorteios.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="icon">📦</div><h4>Nenhum prémio pendente</h4></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = sorteios.map(s => `
+        <tr>
+          <td><strong>${App.escapeHtml(s.clienteNome)}</strong></td>
+          <td>${App.escapeHtml(s.clienteTelefone)}</td>
+          <td>${App.escapeHtml(s.premioNome)}</td>
+          <td><code>${s.codigo}</code></td>
+          <td>${App.formatDateTime(s.dataSorteio)}</td>
+          <td><button class="btn btn-success btn-sm" onclick="marcar('${s.id}')">✓ Marcar como Entregue</button></td>
+        </tr>`).join('');
+    }
+
+    async function marcar(id) {
+      if (!App.confirm('Confirmar que o prémio foi entregue?')) return;
+      try {
+        await Storage.marcarEntregue(id);
+        App.toast('Prémio marcado como entregue!', 'success');
+        await render();
+      } catch (e) {
+        App.toast('Erro', 'error');
+      }
+    }
+
+    document.getElementById('search').addEventListener('input', () => render());
+    render();
+  </script>
+</body>
+</html>

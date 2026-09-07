@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+
+  <script>
+    /* Base path automático para GitHub Pages (repo em subpasta) */
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configurações — Bónus Lodja - Compre e ganhe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">B</div>
+        <div><h1>Bónus Lodja - Compre e ganhe</h1><span>Painel Admin</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="clientes.html" class="nav-item"><span class="icon">👥</span> Clientes</a>
+        <a href="compras.html" class="nav-item"><span class="icon">🛒</span> Compras</a>
+        <a href="elegiveis.html" class="nav-item"><span class="icon">⭐</span> Elegíveis</a>
+        <a href="sorteios.html" class="nav-item"><span class="icon">🎡</span> Sorteios</a>
+        <a href="premios.html" class="nav-item"><span class="icon">🎁</span> Prémios</a>
+        <a href="entregas.html" class="nav-item"><span class="icon">📦</span> Entregas</a>
+        <a href="relatorios.html" class="nav-item"><span class="icon">📈</span> Relatórios</a>
+        <a href="configuracoes.html" class="nav-item active"><span class="icon">⚙️</span> Configurações</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" onclick="Auth.logout()"><span class="icon">🚪</span> Sair</button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay"></div>
+
+    <div class="main-content">
+      <header class="topbar">
+        <div class="d-flex align-center gap-2">
+          <button class="menu-toggle">☰</button>
+          <h2>Configurações</h2>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="card">
+          <div class="card-header"><h3>Geral</h3></div>
+          <div class="card-body" style="padding:20px">
+            <div class="form-group">
+              <label>Nome da Loja</label>
+              <input type="text" id="nomeLoja" class="form-control">
+            </div>
+            <div class="form-group">
+              <label>Peças necessárias para elegibilidade</label>
+              <input type="number" id="pecasNecessarias" class="form-control" min="1" value="5">
+            </div>
+            <div class="form-group">
+              <label>Nova palavra-passe do admin</label>
+              <input type="password" id="adminPassword" class="form-control" placeholder="Deixe em branco para não alterar">
+            </div>
+            <button class="btn btn-primary" onclick="salvarConfig()">Guardar Configurações</button>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header"><h3>Dados</h3></div>
+          <div class="card-body" style="padding:20px">
+            <p class="text-muted mb-2">Os dados estão na base de dados <strong>Supabase</strong> (PostgreSQL na nuvem). Alterações ficam gravadas permanentemente.</p>
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-outline" onclick="seedDemo()">📥 Importar Base de Dados (Excel)</button>
+              <button class="btn btn-danger" onclick="resetAll()">Apagar Todos os Dados</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header"><h3>Base de dados</h3></div>
+          <div class="card-body" style="padding:20px">
+            <p class="text-muted">Os dados do sistema estão guardados no Supabase (nuvem).</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    initSupabase();
+    if (!Auth.requireAuth()) throw new Error("Não autenticado");
+
+    (async () => {
+      const config = await Storage.getConfig();
+      document.getElementById('nomeLoja').value = config.nomeLoja || '';
+      document.getElementById('pecasNecessarias').value = config.pecasNecessarias || 5;
+    })();
+
+    async function salvarConfig() {
+      const cfg = await Storage.getConfig();
+      cfg.nomeLoja = document.getElementById('nomeLoja').value.trim() || 'Bónus Lodja - Compre e ganhe';
+      cfg.pecasNecessarias = parseInt(document.getElementById('pecasNecessarias').value) || 5;
+      const novaPass = document.getElementById('adminPassword').value;
+      if (novaPass) cfg.adminPassword = novaPass;
+      await Storage.saveConfig(cfg);
+      App.toast('Configurações guardadas!', 'success');
+      document.getElementById('adminPassword').value = '';
+    }
+
+    async function seedDemo() {
+      if (!App.confirm('Importar a base de dados real dos clientes (Excel) e substituir os dados actuais?')) return;
+      const result = await Storage.seedDemo();
+      App.toast(`${result.msg} (${result.clientes} clientes, ${result.elegiveis} elegíveis)`, 'success', 5000);
+    }
+
+    function resetAll() {
+      if (!App.confirm('APAGAR TODOS OS DADOS? Esta acção é irreversível.')) return;
+      if (!App.confirm('Tem a certeza absoluta?')) return;
+      Storage.resetAll();
+      App.toast('Todos os dados foram apagados', 'success');
+      setTimeout(() => location.reload(), 1000);
+    }
+  </script>
+</body>
+</html>

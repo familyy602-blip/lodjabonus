@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+
+  <script>
+    /* Base path automático para GitHub Pages (repo em subpasta) */
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatórios — Bónus Lodja - Compre e ganhe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">B</div>
+        <div><h1>Bónus Lodja - Compre e ganhe</h1><span>Painel Admin</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="clientes.html" class="nav-item"><span class="icon">👥</span> Clientes</a>
+        <a href="compras.html" class="nav-item"><span class="icon">🛒</span> Compras</a>
+        <a href="elegiveis.html" class="nav-item"><span class="icon">⭐</span> Elegíveis</a>
+        <a href="sorteios.html" class="nav-item"><span class="icon">🎡</span> Sorteios</a>
+        <a href="premios.html" class="nav-item"><span class="icon">🎁</span> Prémios</a>
+        <a href="entregas.html" class="nav-item"><span class="icon">📦</span> Entregas</a>
+        <a href="relatorios.html" class="nav-item active"><span class="icon">📈</span> Relatórios</a>
+        <a href="configuracoes.html" class="nav-item"><span class="icon">⚙️</span> Configurações</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" onclick="Auth.logout()"><span class="icon">🚪</span> Sair</button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay"></div>
+
+    <div class="main-content">
+      <header class="topbar">
+        <div class="d-flex align-center gap-2">
+          <button class="menu-toggle">☰</button>
+          <h2>Relatórios</h2>
+        </div>
+        <div class="topbar-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="exportarRelatorioExcel()">⬇ Excel</button>
+          <button class="btn btn-outline btn-sm" onclick="exportarRelatorioPDF()">⬇ PDF</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="stats-grid" id="stats"></div>
+
+        <div class="card mt-3">
+          <div class="card-header"><h3>Distribuição de Prémios</h3></div>
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Prémio</th>
+                  <th>Quantidade</th>
+                  <th>Percentagem</th>
+                </tr>
+              </thead>
+              <tbody id="distPremios"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header"><h3>Histórico Completo (últimos 20)</h3></div>
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Evento</th>
+                  <th>Detalhe</th>
+                  <th>Data</th>
+                </tr>
+              </thead>
+              <tbody id="historico"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    initSupabase();
+    if (!Auth.requireAuth()) throw new Error("Não autenticado");
+
+
+    async function exportarRelatorioExcel() {
+      try {
+        if (typeof XLSX === 'undefined') {
+          App.toast('Biblioteca Excel não carregou', 'error');
+          return;
+        }
+        const [stats, sorteios, clientes] = await Promise.all([
+          Storage.getStats(), Storage.getSorteios(), Storage.getClientes()
+        ]);
+
+        const wb = XLSX.utils.book_new();
+
+        // Resumo
+        const resumo = [
+          ['Relatório — Bónus Lodja - Compre e ganhe'],
+          ['Data', new Date().toLocaleString('pt-PT')],
+          [],
+          ['Indicador', 'Valor'],
+          ['Total Clientes', stats.totalClientes],
+          ['Total Compras', stats.totalCompras],
+          ['Total Peças', stats.totalPecas],
+          ['Sorteios realizados', stats.sorteiosRealizados],
+          ['Prémios pendentes', stats.premiosPendentes],
+          ['Prémios entregues', stats.premiosEntregues],
+          ['Clientes elegíveis', stats.clientesElegiveis]
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
+
+        // Clientes
+        const cliRows = [['Nome', 'Telefone', 'Peças', 'Grupo WA', 'Elegível', 'Estado']];
+        clientes.forEach(c => {
+          cliRows.push([
+            c.nome || '', c.telefone || '', c.totalPecas || 0,
+            c.noGrupoWhatsapp ? 'Sim' : 'Não',
+            c.elegivel ? 'Sim' : 'Não',
+            c.estado || ''
+          ]);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cliRows), 'Clientes');
+
+        // Sorteios
+        const sortRows = [['Cliente', 'Telefone', 'Prémio', 'Código', 'Data', 'Estado']];
+        sorteios.forEach(s => {
+          sortRows.push([
+            s.clienteNome || '', s.clienteTelefone || '', s.premioNome || '',
+            s.codigo || '', s.dataSorteio || '', s.estado || ''
+          ]);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sortRows), 'Sorteios');
+
+        XLSX.writeFile(wb, 'relatorio-bonus-loja.xlsx');
+        App.toast('Relatório Excel descarregado!', 'success');
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro ao exportar Excel: ' + (e.message || e), 'error');
+      }
+    }
+
+    async function exportarRelatorioPDF() {
+      try {
+        const [stats, sorteios, clientes] = await Promise.all([
+          Storage.getStats(), Storage.getSorteios(), Storage.getClientes()
+        ]);
+
+        const elegiveis = clientes.filter(c => c.elegivel).length;
+        const win = window.open('', '_blank');
+        if (!win) {
+          App.toast('Permita pop-ups para gerar o PDF', 'warning');
+          return;
+        }
+
+        const sortHtml = sorteios.slice(0, 50).map(s =>
+          `<tr><td>${s.clienteNome || ''}</td><td>${s.premioNome || ''}</td><td>${s.codigo || ''}</td><td>${s.estado || ''}</td></tr>`
+        ).join('') || '<tr><td colspan="4">Sem sorteios</td></tr>';
+
+        const cliHtml = clientes.map(c =>
+          `<tr><td>${c.nome || ''}</td><td>${c.telefone || ''}</td><td>${c.totalPecas || 0}</td><td>${c.elegivel ? 'Sim' : 'Não'}</td></tr>`
+        ).join('');
+
+        win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório</title>
+          <style>
+            body{font-family:Arial,sans-serif;padding:24px;color:#111}
+            h1{font-size:20px;margin:0 0 8px}
+            h2{font-size:16px;margin:24px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px}
+            .meta{color:#555;font-size:12px;margin-bottom:20px}
+            .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+            .card{border:1px solid #ddd;border-radius:8px;padding:12px}
+            .card b{display:block;font-size:20px}
+            table{width:100%;border-collapse:collapse;font-size:12px}
+            th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}
+            th{background:#f5f5f5}
+            @media print{button{display:none}}
+          </style></head><body>
+          <h1>Relatório — Bónus Lodja - Compre e ganhe</h1>
+          <div class="meta">Gerado em ${new Date().toLocaleString('pt-PT')}</div>
+          <div class="grid">
+            <div class="card">Clientes<b>${stats.totalClientes}</b></div>
+            <div class="card">Elegíveis<b>${stats.clientesElegiveis}</b></div>
+            <div class="card">Sorteios<b>${stats.sorteiosRealizados}</b></div>
+            <div class="card">Peças<b>${stats.totalPecas}</b></div>
+            <div class="card">Pendentes<b>${stats.premiosPendentes}</b></div>
+            <div class="card">Entregues<b>${stats.premiosEntregues}</b></div>
+          </div>
+          <h2>Clientes</h2>
+          <table><thead><tr><th>Nome</th><th>Telefone</th><th>Peças</th><th>Elegível</th></tr></thead>
+          <tbody>${cliHtml}</tbody></table>
+          <h2>Sorteios</h2>
+          <table><thead><tr><th>Cliente</th><th>Prémio</th><th>Código</th><th>Estado</th></tr></thead>
+          <tbody>${sortHtml}</tbody></table>
+          <p style="margin-top:24px"><button onclick="window.print()">Imprimir / Guardar como PDF</button></p>
+          <script>setTimeout(function(){window.print()},400)<\/script>
+          </body></html>`);
+        win.document.close();
+        App.toast('Janela de PDF aberta — use Guardar como PDF', 'success');
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro ao gerar PDF: ' + (e.message || e), 'error');
+      }
+    }
+
+    async function render() {
+      const s = await Storage.getStats();
+      document.getElementById('stats').innerHTML = `
+        <div class="stat-card"><div class="label">Total Clientes</div><div class="value primary">${s.totalClientes}</div></div>
+        <div class="stat-card"><div class="label">Total Compras</div><div class="value">${s.totalCompras}</div></div>
+        <div class="stat-card"><div class="label">Total Peças</div><div class="value">${s.totalPecas}</div></div>
+        <div class="stat-card"><div class="label">Sorteios</div><div class="value info">${s.sorteiosRealizados}</div></div>
+        <div class="stat-card"><div class="label">Pendentes</div><div class="value warning">${s.premiosPendentes}</div></div>
+        <div class="stat-card"><div class="label">Entregues</div><div class="value success">${s.premiosEntregues}</div></div>
+      `;
+
+      const sorteios = await Storage.getSorteios();
+      const contagem = {};
+      sorteios.forEach(x => {
+        contagem[x.premioNome] = (contagem[x.premioNome] || 0) + 1;
+      });
+      const total = sorteios.length || 1;
+      const distBody = document.getElementById('distPremios');
+      const entries = Object.entries(contagem);
+      distBody.innerHTML = entries.length
+        ? entries.map(([nome, qtd]) => `
+            <tr>
+              <td>${App.escapeHtml(nome)}</td>
+              <td>${qtd}</td>
+              <td>${((qtd / total) * 100).toFixed(1)}%</td>
+            </tr>`).join('')
+        : '<tr><td colspan="3" class="text-center text-muted">Ainda sem sorteios — a distribuição aparece depois dos clientes girarem a roleta</td></tr>';
+
+      const historico = [];
+      const clientes = await Storage.getClientes();
+      clientes.forEach(c => {
+        if (c.dataCadastro) historico.push({ cliente: c.nome, evento: 'Cadastro', detalhe: (c.totalPecas || 0) + ' peças', data: c.dataCadastro });
+        if (c.dataTokenGerado) historico.push({ cliente: c.nome, evento: 'Link gerado', detalhe: c.token || '', data: c.dataTokenGerado });
+        if (c.dataSorteio) historico.push({ cliente: c.nome, evento: 'Sorteio', detalhe: (c.ultimoPremio || '') + ' (' + (c.ultimoCodigo || '') + ')', data: c.dataSorteio });
+      });
+      sorteios.forEach(x => {
+        if (x.dataEntrega) historico.push({ cliente: x.clienteNome, evento: 'Prémio entregue', detalhe: x.codigo, data: x.dataEntrega });
+      });
+      historico.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+      document.getElementById('historico').innerHTML = historico.slice(0, 30).map(h => `
+        <tr>
+          <td>${App.escapeHtml(h.cliente)}</td>
+          <td>${h.evento}</td>
+          <td>${App.escapeHtml(h.detalhe || '—')}</td>
+          <td>${App.formatDateTime(h.data)}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="4" class="text-center text-muted">Sem histórico ainda</td></tr>';
+    }
+
+    render();
+  </script>
+</body>
+</html>
