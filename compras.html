@@ -183,7 +183,7 @@
             <td>${App.escapeHtml(c.observacao || '—')}</td>
             <td>
               <button class="btn btn-outline btn-sm" onclick="editarCompra('${c.id}')">Editar</button>
-              <button class="btn btn-outline btn-sm" onclick="imprimirFactura('${c.id}')">Factura</button>
+              <button class="btn btn-factura btn-sm" onclick="imprimirFactura('${c.id}')">📄 Factura</button>
               <button class="btn btn-danger btn-sm" onclick="apagarCompra('${c.id}')">Apagar</button>
             </td>
           </tr>`;
@@ -265,31 +265,55 @@
       const cliente = await Storage.getClienteById(c.clienteId);
       const cfg = await Storage.getConfig();
       const loja = cfg.nomeLoja || 'Bónus Lodja - Compre e ganhe';
-      const logo = cfg.logoUrl ? `<img src="${cfg.logoUrl}" style="width:56px;height:56px;border-radius:10px;object-fit:cover">` : '';
-      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Factura ${c.numeroFactura || ''}</title>
+      const logo = cfg.logoUrl ? `<img src="${cfg.logoUrl}" alt="Logo" style="width:56px;height:56px;border-radius:10px;object-fit:cover">` : '';
+      const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Factura ${c.numeroFactura || ''}</title>
         <style>
-          body{font-family:Inter,Arial,sans-serif;padding:32px;color:#0f172a;max-width:720px;margin:0 auto}
-          .head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #6366f1;padding-bottom:16px;margin-bottom:24px}
-          h1{font-size:22px;margin:0 0 4px} .muted{color:#64748b;font-size:13px}
+          *{box-sizing:border-box}
+          body{font-family:Inter,Arial,sans-serif;padding:24px;color:#0f172a;max-width:720px;margin:0 auto;background:#f8fafc}
+          .toolbar{position:sticky;top:0;z-index:10;display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+            background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:20px;
+            box-shadow:0 4px 12px rgba(15,23,42,.06)}
+          .btn-back{display:inline-flex;align-items:center;gap:6px;background:#0f172a;color:#fff;border:none;
+            border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;cursor:pointer;text-decoration:none}
+          .btn-back:hover{background:#1e293b}
+          .btn-print{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+            color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;cursor:pointer}
+          .btn-print:hover{filter:brightness(1.08)}
+          .sheet{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px;box-shadow:0 8px 24px rgba(15,23,42,.05)}
+          .head{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:2px solid #6366f1;padding-bottom:16px;margin-bottom:24px;flex-wrap:wrap}
+          h1{font-size:22px;margin:0 0 4px;color:#0f172a}
+          .muted{color:#64748b;font-size:13px}
           table{width:100%;border-collapse:collapse;margin-top:16px}
           th,td{border:1px solid #e2e8f0;padding:10px;text-align:left}
           th{background:#f1f5f9}
-          .tot{font-size:18px;font-weight:700;margin-top:20px;text-align:right}
-          @media print{button{display:none}}
+          .tot{font-size:18px;font-weight:700;margin-top:20px;text-align:right;color:#4f46e5}
+          @media print{
+            body{background:#fff;padding:0}
+            .toolbar{display:none!important}
+            .sheet{box-shadow:none;border:none;padding:0}
+          }
         </style></head><body>
-        <div class="head"><div>${logo}<h1>${loja}</h1><div class="muted">Factura de compra</div></div>
-        <div><strong>Nº:</strong> ${c.numeroFactura || '—'}<br><strong>Data:</strong> ${c.data || '—'}</div></div>
-        <p><strong>Cliente:</strong> ${(cliente && cliente.nome) || '—'}<br>
-        <strong>Telefone:</strong> ${(cliente && cliente.telefone) || '—'}</p>
-        <table><thead><tr><th>Descrição</th><th>Peças</th><th>Valor</th></tr></thead>
-        <tbody><tr><td>Compra / artigos</td><td>${c.quantidadePecas}</td>
-        <td>${c.valor ? Number(c.valor).toLocaleString('pt-PT') + ' MZN' : '—'}</td></tr></tbody></table>
-        ${c.observacao ? '<p class="muted">Obs: ' + c.observacao + '</p>' : ''}
-        <div class="tot">Total: ${c.valor ? Number(c.valor).toLocaleString('pt-PT') + ' MZN' : '—'}</div>
-        <p class="muted" style="margin-top:40px">Documento gerado pelo sistema Bónus Lodja</p>
-        <button onclick="window.print()" style="margin-top:16px;padding:10px 16px">Imprimir</button>
+        <div class="toolbar">
+          <button type="button" class="btn-back" onclick="window.close()">← Voltar</button>
+          <button type="button" class="btn-print" onclick="window.print()">🖨 Imprimir / PDF</button>
+        </div>
+        <div class="sheet">
+          <div class="head">
+            <div style="display:flex;align-items:center;gap:12px">${logo}<div><h1>${loja}</h1><div class="muted">Factura de compra</div></div></div>
+            <div><strong>Nº:</strong> ${c.numeroFactura || '—'}<br><strong>Data:</strong> ${c.data || '—'}</div>
+          </div>
+          <p><strong>Cliente:</strong> ${(cliente && cliente.nome) || '—'}<br>
+          <strong>Telefone:</strong> ${(cliente && cliente.telefone) || '—'}</p>
+          <table><thead><tr><th>Descrição</th><th>Peças</th><th>Valor</th></tr></thead>
+          <tbody><tr><td>Compra / artigos</td><td>${c.quantidadePecas}</td>
+          <td>${c.valor ? Number(c.valor).toLocaleString('pt-PT') + ' MZN' : '—'}</td></tr></tbody></table>
+          ${c.observacao ? '<p class="muted">Obs: ' + c.observacao + '</p>' : ''}
+          <div class="tot">Total: ${c.valor ? Number(c.valor).toLocaleString('pt-PT') + ' MZN' : '—'}</div>
+          <p class="muted" style="margin-top:40px">Documento gerado pelo sistema Bónus Lodja</p>
+        </div>
         </body></html>`;
       const w = window.open('', '_blank');
+      if (!w) { App.toast('Permita pop-ups para abrir a factura', 'error'); return; }
       w.document.write(html);
       w.document.close();
     }

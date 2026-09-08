@@ -358,7 +358,30 @@
         ? '<table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Cliente</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Evento</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Detalhe</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Data</th></tr></thead><tbody>' +
           dados.histRows.map(function(r) { return '<tr>' + r.map(function(c) { return '<td style="border:1px solid #e2e8f0;padding:8px">' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'
         : '<p>Sem eventos</p>';
-      return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório Bónus Lodja</title><style>body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;padding:28px;max-width:900px;margin:0 auto}h1{color:#4f46e5}h2{margin-top:28px;font-size:16px;border-bottom:2px solid #6366f1;padding-bottom:6px}.meta{color:#64748b;font-size:13px;margin-bottom:20px}</style></head><body><h1>Bónus Lodja — Relatório</h1><div class="meta">Período: <strong>' + dados.periodo + '</strong> · Gerado em ' + dados.gerado + '</div><h2>Indicadores</h2>' + kpiHtml + '<h2>Top clientes</h2>' + topHtml + '<h2>Histórico de eventos</h2>' + histHtml + '<p style="margin-top:40px;font-size:12px;color:#94a3b8">Documento gerado pelo sistema Bónus Lodja</p></body></html>';
+      return '<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório</title>' +
+        '<style>' +
+        '*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;padding:24px;max-width:900px;margin:0 auto;background:#f8fafc}' +
+        '.toolbar{position:sticky;top:0;z-index:10;display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:20px;box-shadow:0 4px 12px rgba(15,23,42,.06)}' +
+        '.btn-back{display:inline-flex;align-items:center;gap:6px;background:#0f172a;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;cursor:pointer}' +
+        '.btn-back:hover{background:#1e293b}' +
+        '.btn-print{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;cursor:pointer}' +
+        '.sheet{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px;box-shadow:0 8px 24px rgba(15,23,42,.05)}' +
+        'h1{color:#4f46e5;margin:0 0 8px;font-size:26px}h2{margin-top:28px;font-size:16px;border-bottom:2px solid #6366f1;padding-bottom:6px}' +
+        '.meta{color:#64748b;font-size:13px;margin-bottom:20px}' +
+        '@media print{body{background:#fff;padding:0}.toolbar{display:none!important}.sheet{box-shadow:none;border:none;padding:0}}' +
+        '</style></head><body>' +
+        '<div class="toolbar">' +
+        '<button type="button" class="btn-back" onclick="window.close()">← Voltar</button>' +
+        '<button type="button" class="btn-print" onclick="window.print()">🖨 Imprimir / PDF</button>' +
+        '</div>' +
+        '<div class="sheet">' +
+        '<h1>Relatório</h1>' +
+        '<div class="meta">Período: <strong>' + dados.periodo + '</strong> · Gerado em ' + dados.gerado + '</div>' +
+        '<h2>Indicadores</h2>' + kpiHtml +
+        '<h2>Top clientes</h2>' + topHtml +
+        '<h2>Histórico de eventos</h2>' + histHtml +
+        '<p style="margin-top:40px;font-size:12px;color:#94a3b8">Documento gerado pelo sistema Bónus Lodja</p>' +
+        '</div></body></html>';
     }
 
     function exportarPDF() {

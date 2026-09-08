@@ -903,3 +903,18 @@ input[type="date"], input[type="number"], input[type="password"], input[type="te
   background-color: transparent !important;
   overflow: hidden;
 }
+
+
+/* Botão Factura */
+.btn-factura {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff !important;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+.btn-factura:hover:not(:disabled) {
+  filter: brightness(1.08);
+  color: #fff !important;
+}
