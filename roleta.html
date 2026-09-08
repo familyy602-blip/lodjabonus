@@ -388,30 +388,51 @@
       try {
         const ctx = getAudio();
         const o = ctx.createOscillator();
+        const o2 = ctx.createOscillator();
         const g = ctx.createGain();
-        o.type = 'square';
-        o.frequency.value = 800 + Math.random() * 400;
-        g.gain.value = 0.04;
-        o.connect(g); g.connect(ctx.destination);
-        o.start();
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
-        o.stop(ctx.currentTime + 0.06);
+        o.type = 'sawtooth';
+        o2.type = 'square';
+        o.frequency.value = 220 + Math.random() * 180;
+        o2.frequency.value = 440 + Math.random() * 320;
+        g.gain.value = 0.14;
+        o.connect(g); o2.connect(g); g.connect(ctx.destination);
+        o.start(); o2.start();
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
+        o.stop(ctx.currentTime + 0.08);
+        o2.stop(ctx.currentTime + 0.08);
       } catch (e) {}
     }
     function playWinSound() {
       try {
         const ctx = getAudio();
-        [523, 659, 784, 1046].forEach((freq, i) => {
+        // Fanfarra mais explosiva
+        const notes = [523, 659, 784, 1046, 784, 1046, 1319];
+        notes.forEach((freq, i) => {
           const o = ctx.createOscillator();
+          const o2 = ctx.createOscillator();
           const g = ctx.createGain();
+          o.type = 'square';
+          o2.type = 'triangle';
           o.frequency.value = freq;
-          o.type = 'sine';
-          g.gain.value = 0.08;
-          o.connect(g); g.connect(ctx.destination);
-          o.start(ctx.currentTime + i * 0.12);
-          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.3);
-          o.stop(ctx.currentTime + i * 0.12 + 0.35);
+          o2.frequency.value = freq * 2;
+          g.gain.value = 0.16;
+          o.connect(g); o2.connect(g); g.connect(ctx.destination);
+          const t0 = ctx.currentTime + i * 0.09;
+          o.start(t0); o2.start(t0);
+          g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.28);
+          o.stop(t0 + 0.3); o2.stop(t0 + 0.3);
         });
+        // Boom final
+        const boom = ctx.createOscillator();
+        const bg = ctx.createGain();
+        boom.type = 'sawtooth';
+        boom.frequency.value = 80;
+        bg.gain.value = 0.22;
+        boom.connect(bg); bg.connect(ctx.destination);
+        boom.start(ctx.currentTime + 0.65);
+        boom.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 1.1);
+        bg.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.15);
+        boom.stop(ctx.currentTime + 1.2);
       } catch (e) {}
     }
 
@@ -458,8 +479,8 @@
       const tickInterval = setInterval(() => {
         playTick();
         ticks++;
-        if (ticks > 40) clearInterval(tickInterval);
-      }, 120);
+        if (ticks > 55) clearInterval(tickInterval);
+      }, 90);
 
       setTimeout(() => {
         clearInterval(tickInterval);

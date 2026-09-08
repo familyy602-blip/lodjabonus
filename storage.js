@@ -146,12 +146,25 @@ const Storage = {
     }));
   },
 
+  async nextFacturaNumero() {
+    const compras = await this.getCompras();
+    let max = 0;
+    compras.forEach(c => {
+      const n = String(c.numeroFactura || '').replace(/\D/g, '');
+      if (n) max = Math.max(max, parseInt(n, 10) || 0);
+    });
+    const next = max + 1;
+    return String(next).padStart(3, '0');
+  },
+
   async addCompra(compra) {
     const id = this.generateId('cmp_');
+    let numero = (compra.numeroFactura || '').trim();
+    if (!numero) numero = await this.nextFacturaNumero();
     const row = {
       id,
       cliente_id: compra.clienteId,
-      numero_factura: compra.numeroFactura || '',
+      numero_factura: numero,
       quantidade_pecas: parseInt(compra.quantidadePecas) || 1,
       valor: parseFloat(compra.valor) || 0,
       data: compra.data || new Date().toISOString().split('T')[0],
@@ -166,6 +179,30 @@ const Storage = {
     await this.updateCliente(compra.clienteId, { totalPecas, totalCompras });
 
     return { id, clienteId: compra.clienteId, numeroFactura: row.numero_factura, quantidadePecas: row.quantidade_pecas, valor: row.valor, data: row.data, observacao: row.observacao };
+  },
+
+  async updateCompra(id, compra) {
+    const atual = (await this.getCompras()).find(c => c.id === id);
+    if (!atual) throw new Error('Compra não encontrada');
+    const row = {
+      cliente_id: compra.clienteId || atual.clienteId,
+      numero_factura: (compra.numeroFactura != null ? compra.numeroFactura : atual.numeroFactura) || '',
+      quantidade_pecas: parseInt(compra.quantidadePecas != null ? compra.quantidadePecas : atual.quantidadePecas) || 1,
+      valor: parseFloat(compra.valor != null ? compra.valor : atual.valor) || 0,
+      data: compra.data || atual.data,
+      observacao: compra.observacao != null ? compra.observacao : (atual.observacao || '')
+    };
+    const { error } = await this._db().from('compras').update(row).eq('id', id);
+    if (error) { console.error(error); throw error; }
+
+    // Recalcular totais do cliente antigo e do novo (se mudou)
+    const ids = new Set([atual.clienteId, row.cliente_id].filter(Boolean));
+    for (const cid of ids) {
+      const { data: lista } = await this._db().from('compras').select('quantidade_pecas').eq('cliente_id', cid);
+      const totalPecas = (lista || []).reduce((s, c) => s + (c.quantidade_pecas || 0), 0);
+      await this.updateCliente(cid, { totalPecas, totalCompras: (lista || []).length });
+    }
+    return { id, clienteId: row.cliente_id, numeroFactura: row.numero_factura, quantidadePecas: row.quantidade_pecas, valor: row.valor, data: row.data, observacao: row.observacao };
   },
 
   async deleteCompra(id) {

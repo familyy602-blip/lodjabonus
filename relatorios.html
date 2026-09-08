@@ -21,6 +21,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     .filtros-bar {
       display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
@@ -126,6 +127,9 @@
             <input type="date" id="filtroAte" class="form-control">
           </div>
           <button class="btn btn-primary" onclick="render()">Aplicar</button>
+          <button class="btn btn-outline" type="button" onclick="exportarPDF()">📄 PDF</button>
+          <button class="btn btn-outline" type="button" onclick="exportarWord()">📝 Word</button>
+          <button class="btn btn-outline" type="button" onclick="exportarExcel()">📊 Excel</button>
         </div>
 
         <!-- KPIs -->
@@ -304,6 +308,143 @@
           }
         }
       });
+    }
+
+
+    function periodoLabel() {
+      var v = document.getElementById('filtroPeriodo').value;
+      var map = { tudo:'Todo o período', mes:'Este mês', mes_ant:'Mês anterior', '3m':'Últimos 3 meses', '6m':'Últimos 6 meses', ano:'Este ano', custom:'Personalizado' };
+      return map[v] || v;
+    }
+
+    function coletarDadosRelatorio() {
+      var kpis = [].slice.call(document.querySelectorAll('#kpis .stat-mini')).map(function(el) {
+        var lab = el.querySelector('.label');
+        var val = el.querySelector('.value');
+        return { label: lab ? lab.textContent : '', value: val ? val.textContent : '' };
+      });
+      var topRows = [].slice.call(document.querySelectorAll('#topClientes tr')).map(function(tr) {
+        return [].slice.call(tr.querySelectorAll('td')).map(function(td) { return td.textContent.trim(); });
+      }).filter(function(r) { return r.length; });
+      var histRows = [].slice.call(document.querySelectorAll('#historico tr')).map(function(tr) {
+        return [].slice.call(tr.querySelectorAll('td')).map(function(td) { return td.textContent.trim(); });
+      }).filter(function(r) { return r.length; });
+      var series = { labels: [], compras: [], valor: [], pecas: [], sorteios: [], premiosLabels: [], premiosData: [] };
+      try {
+        if (charts.chartCompras) {
+          series.labels = charts.chartCompras.data.labels || [];
+          series.compras = (charts.chartCompras.data.datasets[0] && charts.chartCompras.data.datasets[0].data) || [];
+        }
+        if (charts.chartValor) series.valor = (charts.chartValor.data.datasets[0] && charts.chartValor.data.datasets[0].data) || [];
+        if (charts.chartPecas) series.pecas = (charts.chartPecas.data.datasets[0] && charts.chartPecas.data.datasets[0].data) || [];
+        if (charts.chartSorteios) series.sorteios = (charts.chartSorteios.data.datasets[0] && charts.chartSorteios.data.datasets[0].data) || [];
+        if (charts.chartPremios) {
+          series.premiosLabels = charts.chartPremios.data.labels || [];
+          series.premiosData = (charts.chartPremios.data.datasets[0] && charts.chartPremios.data.datasets[0].data) || [];
+        }
+      } catch (e) {}
+      return { kpis: kpis, topRows: topRows, histRows: histRows, series: series, periodo: periodoLabel(), gerado: new Date().toLocaleString('pt-PT') };
+    }
+
+    function montarHtmlRelatorio(dados) {
+      var kpiHtml = dados.kpis.map(function(k) {
+        return '<div style="display:inline-block;min-width:120px;margin:6px 10px 6px 0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px"><div style="font-size:11px;color:#64748b">' + k.label + '</div><div style="font-size:18px;font-weight:700">' + k.value + '</div></div>';
+      }).join('');
+      var topHtml = dados.topRows.length
+        ? '<table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">#</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Cliente</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Telefone</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Peças</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Compras</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Valor</th></tr></thead><tbody>' +
+          dados.topRows.map(function(r) { return '<tr>' + r.map(function(c) { return '<td style="border:1px solid #e2e8f0;padding:8px">' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'
+        : '<p>Sem dados</p>';
+      var histHtml = dados.histRows.length
+        ? '<table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Cliente</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Evento</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Detalhe</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Data</th></tr></thead><tbody>' +
+          dados.histRows.map(function(r) { return '<tr>' + r.map(function(c) { return '<td style="border:1px solid #e2e8f0;padding:8px">' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'
+        : '<p>Sem eventos</p>';
+      return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório Bónus Lodja</title><style>body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;padding:28px;max-width:900px;margin:0 auto}h1{color:#4f46e5}h2{margin-top:28px;font-size:16px;border-bottom:2px solid #6366f1;padding-bottom:6px}.meta{color:#64748b;font-size:13px;margin-bottom:20px}</style></head><body><h1>Bónus Lodja — Relatório</h1><div class="meta">Período: <strong>' + dados.periodo + '</strong> · Gerado em ' + dados.gerado + '</div><h2>Indicadores</h2>' + kpiHtml + '<h2>Top clientes</h2>' + topHtml + '<h2>Histórico de eventos</h2>' + histHtml + '<p style="margin-top:40px;font-size:12px;color:#94a3b8">Documento gerado pelo sistema Bónus Lodja</p></body></html>';
+    }
+
+    function exportarPDF() {
+      try {
+        var dados = coletarDadosRelatorio();
+        var html = montarHtmlRelatorio(dados);
+        var w = window.open('', '_blank');
+        if (!w) { App.toast('Permita pop-ups para exportar PDF', 'error'); return; }
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+        setTimeout(function() { w.focus(); w.print(); }, 500);
+        App.toast('Na impressão escolha "Guardar como PDF"', 'info', 4500);
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro PDF: ' + (e.message || e), 'error');
+      }
+    }
+
+    function exportarWord() {
+      try {
+        var dados = coletarDadosRelatorio();
+        var html = montarHtmlRelatorio(dados);
+        var blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'Relatorio-Bonus-Lodja-' + new Date().toISOString().slice(0, 10) + '.doc';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function() { a.remove(); URL.revokeObjectURL(url); }, 400);
+        App.toast('Word descarregado', 'success');
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro Word: ' + (e.message || e), 'error');
+      }
+    }
+
+    function exportarExcel() {
+      try {
+        if (typeof XLSX === 'undefined') {
+          App.toast('Biblioteca Excel não carregou. Recarregue a página (Ctrl+F5).', 'error');
+          return;
+        }
+        var dados = coletarDadosRelatorio();
+        var wb = XLSX.utils.book_new();
+
+        var resumo = [['Bónus Lodja — Relatório'], ['Período', dados.periodo], ['Gerado em', dados.gerado], [], ['Indicador', 'Valor']];
+        dados.kpis.forEach(function(k) { resumo.push([k.label, k.value]); });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
+
+        var labels = dados.series.labels || [];
+        var graf = [['Periodo', 'Compras', 'Valor (MT)', 'Pecas', 'Sorteios']];
+        for (var i = 0; i < labels.length; i++) {
+          graf.push([
+            labels[i],
+            (dados.series.compras && dados.series.compras[i]) || 0,
+            (dados.series.valor && dados.series.valor[i]) || 0,
+            (dados.series.pecas && dados.series.pecas[i]) || 0,
+            (dados.series.sorteios && dados.series.sorteios[i]) || 0
+          ]);
+        }
+        if (graf.length === 1) graf.push(['Sem dados', 0, 0, 0, 0]);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(graf), 'Dados Graficos');
+
+        var prem = [['Premio', 'Quantidade']];
+        var pl = dados.series.premiosLabels || [];
+        var pd = dados.series.premiosData || [];
+        for (var j = 0; j < pl.length; j++) prem.push([pl[j], pd[j] || 0]);
+        if (prem.length === 1) prem.push(['Sem dados', 0]);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(prem), 'Premios');
+
+        var top = [['#', 'Cliente', 'Telefone', 'Pecas', 'Compras', 'Valor']];
+        dados.topRows.forEach(function(r) { top.push(r); });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(top), 'Top Clientes');
+
+        var hist = [['Cliente', 'Evento', 'Detalhe', 'Data']];
+        dados.histRows.forEach(function(r) { hist.push(r); });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hist), 'Historico');
+
+        XLSX.writeFile(wb, 'Relatorio-Bonus-Lodja-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+        App.toast('Excel pronto! Folha "Dados Graficos": selecione dados → Inserir → Gráfico', 'success', 5500);
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro Excel: ' + (e.message || e), 'error');
+      }
     }
 
     async function render() {

@@ -92,7 +92,7 @@
   <div class="modal-overlay" id="modalCompra">
     <div class="modal">
       <div class="modal-header">
-        <h3>Nova Compra</h3>
+        <h3 id="modalCompraTitle">Nova Compra</h3>
         <button class="btn btn-outline btn-sm" onclick="App.closeModal('modalCompra')">✕</button>
       </div>
       <div class="modal-body">
@@ -105,7 +105,8 @@
         <div class="form-row">
           <div class="form-group">
             <label>Nº da Factura</label>
-            <input type="text" id="numeroFactura" class="form-control" placeholder="FT001">
+            <input type="text" id="numeroFactura" class="form-control" placeholder="Automático (001, 002...)" readonly>
+            <small class="text-muted" style="font-size:11px">Gerado automaticamente pelo sistema</small>
           </div>
           <div class="form-group">
             <label>Quantidade de Peças *</label>
@@ -129,7 +130,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline" onclick="App.closeModal('modalCompra')">Cancelar</button>
-        <button class="btn btn-primary" onclick="salvarCompra()">Registar Compra</button>
+        <button class="btn btn-primary" id="btnSalvarCompra" onclick="salvarCompra()">Registar Compra</button>
       </div>
     </div>
   </div>
@@ -180,19 +181,48 @@
             <td><strong>${c.quantidadePecas}</strong></td>
             <td>${c.valor ? Number(c.valor).toLocaleString('pt-PT') + ' MZN' : '—'}</td>
             <td>${App.escapeHtml(c.observacao || '—')}</td>
-            <td><button class="btn btn-danger btn-sm" onclick="apagarCompra('${c.id}')">Apagar</button></td>
+            <td>
+              <button class="btn btn-outline btn-sm" onclick="editarCompra('${c.id}')">Editar</button>
+              <button class="btn btn-outline btn-sm" onclick="imprimirFactura('${c.id}')">Factura</button>
+              <button class="btn btn-danger btn-sm" onclick="apagarCompra('${c.id}')">Apagar</button>
+            </td>
           </tr>`;
       }).join('');
     }
 
+    let editCompraId = null;
+
     async function openNovaCompra() {
+      editCompraId = null;
+      document.getElementById('modalCompraTitle').textContent = 'Nova Compra';
+      document.getElementById('btnSalvarCompra').textContent = 'Registar Compra';
       await popularClientes();
       document.getElementById('clienteId').value = '';
-      document.getElementById('numeroFactura').value = '';
+      const next = await Storage.nextFacturaNumero();
+      document.getElementById('numeroFactura').value = next;
+      document.getElementById('numeroFactura').readOnly = true;
       document.getElementById('quantidadePecas').value = 1;
       document.getElementById('valor').value = '';
       document.getElementById('data').value = new Date().toISOString().split('T')[0];
       document.getElementById('observacao').value = '';
+      App.openModal('modalCompra');
+    }
+
+    async function editarCompra(id) {
+      const compras = await Storage.getCompras();
+      const c = compras.find(x => x.id === id);
+      if (!c) return;
+      editCompraId = id;
+      document.getElementById('modalCompraTitle').textContent = 'Editar Compra';
+      document.getElementById('btnSalvarCompra').textContent = 'Guardar Alterações';
+      await popularClientes();
+      document.getElementById('clienteId').value = c.clienteId || '';
+      document.getElementById('numeroFactura').value = c.numeroFactura || '';
+      document.getElementById('numeroFactura').readOnly = false;
+      document.getElementById('quantidadePecas').value = c.quantidadePecas || 1;
+      document.getElementById('valor').value = c.valor || '';
+      document.getElementById('data').value = c.data || '';
+      document.getElementById('observacao').value = c.observacao || '';
       App.openModal('modalCompra');
     }
 
@@ -201,24 +231,67 @@
       const quantidadePecas = parseInt(document.getElementById('quantidadePecas').value) || 0;
       if (!clienteId) { App.toast('Seleccione o cliente', 'error'); return; }
       if (quantidadePecas < 1) { App.toast('Quantidade inválida', 'error'); return; }
+      const payload = {
+        clienteId,
+        numeroFactura: document.getElementById('numeroFactura').value.trim(),
+        quantidadePecas,
+        valor: parseFloat(document.getElementById('valor').value) || 0,
+        data: document.getElementById('data').value,
+        observacao: document.getElementById('observacao').value.trim()
+      };
       try {
-        await Storage.addCompra({
-          clienteId,
-          numeroFactura: document.getElementById('numeroFactura').value.trim(),
-          quantidadePecas,
-          valor: parseFloat(document.getElementById('valor').value) || 0,
-          data: document.getElementById('data').value,
-          observacao: document.getElementById('observacao').value.trim()
-        });
+        if (editCompraId) {
+          await Storage.updateCompra(editCompraId, payload);
+          App.toast('Compra actualizada!', 'success');
+        } else {
+          const criada = await Storage.addCompra(payload);
+          App.toast(`Compra registada! Factura nº ${criada.numeroFactura}`, 'success');
+        }
         const cliente = await Storage.getClienteById(clienteId);
-        App.toast(`Compra registada! ${cliente.nome} tem ${cliente.totalPecas} peças.`, 'success');
-        if (cliente.elegivel) App.toast(`${cliente.nome} está ELEGÍVEL!`, 'success', 4000);
+        if (cliente && cliente.elegivel) App.toast(`${cliente.nome} está ELEGÍVEL!`, 'success', 4000);
         App.closeModal('modalCompra');
+        editCompraId = null;
         await render();
       } catch (e) {
         console.error(e);
         App.toast('Erro: ' + (e.message || e), 'error');
       }
+    }
+
+    async function imprimirFactura(id) {
+      const compras = await Storage.getCompras();
+      const c = compras.find(x => x.id === id);
+      if (!c) return;
+      const cliente = await Storage.getClienteById(c.clienteId);
+      const cfg = await Storage.getConfig();
+      const loja = cfg.nomeLoja || 'Bónus Lodja - Compre e ganhe';
+      const logo = cfg.logoUrl ? `<img src="${cfg.logoUrl}" style="width:56px;height:56px;border-radius:10px;object-fit:cover">` : '';
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Factura ${c.numeroFactura || ''}</title>
+        <style>
+          body{font-family:Inter,Arial,sans-serif;padding:32px;color:#0f172a;max-width:720px;margin:0 auto}
+          .head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #6366f1;padding-bottom:16px;margin-bottom:24px}
+          h1{font-size:22px;margin:0 0 4px} .muted{color:#64748b;font-size:13px}
+          table{width:100%;border-collapse:collapse;margin-top:16px}
+          th,td{border:1px solid #e2e8f0;padding:10px;text-align:left}
+          th{background:#f1f5f9}
+          .tot{font-size:18px;font-weight:700;margin-top:20px;text-align:right}
+          @media print{button{display:none}}
+        </style></head><body>
+        <div class="head"><div>${logo}<h1>${loja}</h1><div class="muted">Factura de compra</div></div>
+        <div><strong>Nº:</strong> ${c.numeroFactura || '—'}<br><strong>Data:</strong> ${c.data || '—'}</div></div>
+        <p><strong>Cliente:</strong> ${(cliente && cliente.nome) || '—'}<br>
+        <strong>Telefone:</strong> ${(cliente && cliente.telefone) || '—'}</p>
+        <table><thead><tr><th>Descrição</th><th>Peças</th><th>Valor</th></tr></thead>
+        <tbody><tr><td>Compra / artigos</td><td>${c.quantidadePecas}</td>
+        <td>${c.valor ? Number(c.valor).toLocaleString('pt-PT') + ' MZN' : '—'}</td></tr></tbody></table>
+        ${c.observacao ? '<p class="muted">Obs: ' + c.observacao + '</p>' : ''}
+        <div class="tot">Total: ${c.valor ? Number(c.valor).toLocaleString('pt-PT') + ' MZN' : '—'}</div>
+        <p class="muted" style="margin-top:40px">Documento gerado pelo sistema Bónus Lodja</p>
+        <button onclick="window.print()" style="margin-top:16px;padding:10px 16px">Imprimir</button>
+        </body></html>`;
+      const w = window.open('', '_blank');
+      w.document.write(html);
+      w.document.close();
     }
 
     async function apagarCompra(id) {
