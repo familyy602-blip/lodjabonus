@@ -331,24 +331,88 @@
       document.getElementById('btnGirar').addEventListener('click', () => girar(token, premios));
     }
 
+    // Cores vivas por defeito (se o prémio não tiver cor)
+    const CORES_VIVAS = ['#FF1744', '#FF9100', '#FFD600', '#00E676', '#00B0FF', '#D500F9', '#FF4081', '#651FFF'];
+
     function drawWheel(premios) {
       const wheel = document.getElementById('wheel');
       if (!premios.length) return;
 
-      const total = premios.reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0);
+      const total = premios.reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0) || 1;
       let current = 0;
-      const colors = premios.map(p => p.cor || '#6366f1');
       let gradientParts = [];
 
       premios.forEach((p, i) => {
         const pct = ((parseFloat(p.probabilidade) || 0) / total) * 100;
+        const cor = p.cor && p.cor !== '#6366f1' ? p.cor : CORES_VIVAS[i % CORES_VIVAS.length];
         const start = current;
         const end = current + pct;
-        gradientParts.push(`${colors[i]} ${start}% ${end}%`);
+        gradientParts.push(`${cor} ${start}% ${end}%`);
         current = end;
       });
 
       wheel.style.background = `conic-gradient(from -90deg, ${gradientParts.join(', ')})`;
+
+      // Etiquetas com o nome do bónus em cada fatia
+      let labels = document.getElementById('wheelLabels');
+      if (!labels) {
+        labels = document.createElement('div');
+        labels.id = 'wheelLabels';
+        labels.className = 'wheel-labels';
+        wheel.parentElement.appendChild(labels);
+      }
+      labels.innerHTML = '';
+      current = 0;
+      premios.forEach((p, i) => {
+        const pct = ((parseFloat(p.probabilidade) || 0) / total) * 100;
+        const mid = current + pct / 2;
+        const angle = (mid / 100) * 360 - 90; // alinhado com conic-gradient from -90deg
+        const rad = angle * Math.PI / 180;
+        const label = document.createElement('div');
+        label.className = 'wheel-label';
+        const short = (p.nome || '').length > 18 ? (p.nome || '').slice(0, 16) + '…' : (p.nome || '');
+        label.textContent = short;
+        label.style.transform = `rotate(${angle + 90}deg) translateY(-108px) rotate(${-(angle + 90)}deg)`;
+        labels.appendChild(label);
+        current += pct;
+      });
+    }
+
+    // Som de fundo / giro (Web Audio - sem ficheiro externo)
+    let audioCtx = null;
+    function getAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+    function playTick() {
+      try {
+        const ctx = getAudio();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'square';
+        o.frequency.value = 800 + Math.random() * 400;
+        g.gain.value = 0.04;
+        o.connect(g); g.connect(ctx.destination);
+        o.start();
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+        o.stop(ctx.currentTime + 0.06);
+      } catch (e) {}
+    }
+    function playWinSound() {
+      try {
+        const ctx = getAudio();
+        [523, 659, 784, 1046].forEach((freq, i) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.frequency.value = freq;
+          o.type = 'sine';
+          g.gain.value = 0.08;
+          o.connect(g); g.connect(ctx.destination);
+          o.start(ctx.currentTime + i * 0.12);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.3);
+          o.stop(ctx.currentTime + i * 0.12 + 0.35);
+        });
+      } catch (e) {}
     }
 
     async function girar(token, premios) {
@@ -389,7 +453,17 @@
       wheel.classList.add('spinning');
       wheel.style.transform = `rotate(${rotacaoFinal}deg)`;
 
+      // Tiques durante o giro
+      let ticks = 0;
+      const tickInterval = setInterval(() => {
+        playTick();
+        ticks++;
+        if (ticks > 40) clearInterval(tickInterval);
+      }, 120);
+
       setTimeout(() => {
+        clearInterval(tickInterval);
+        playWinSound();
         mostrarResultado(sorteio, premio);
         lancarConfetti();
       }, 5200);

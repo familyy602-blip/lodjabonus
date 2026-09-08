@@ -325,3 +325,31 @@
   font-size: 12px;
   color: #64748b;
 }
+
+
+/* Etiquetas dos prémios na roleta */
+.wheel-wrapper { position: relative; }
+.wheel-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.wheel-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 90px;
+  margin-left: -45px;
+  margin-top: -10px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.85);
+  line-height: 1.15;
+  pointer-events: none;
+}

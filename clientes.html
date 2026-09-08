@@ -40,6 +40,7 @@
         <a href="premios.html" class="nav-item" data-page="premios"><span class="icon">🎁</span> Prémios</a>
         <a href="entregas.html" class="nav-item" data-page="entregas"><span class="icon">📦</span> Entregas</a>
         <a href="relatorios.html" class="nav-item" data-page="relatorios"><span class="icon">📈</span> Relatórios</a>
+        <a href="bonus-especial.html" class="nav-item" target="_blank"><span class="icon">🔥</span> Bónus Especial</a>
         <a href="configuracoes.html" class="nav-item" data-page="config"><span class="icon">⚙️</span> Configurações</a>
       </nav>
       <div class="sidebar-footer">
@@ -139,6 +140,17 @@
             </select>
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Total de peças</label>
+            <input type="number" id="totalPecas" class="form-control" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label>Total de compras</label>
+            <input type="number" id="totalCompras" class="form-control" min="0" value="0">
+          </div>
+        </div>
+        <p class="text-muted" style="font-size:12px;margin-top:4px">Pode ajustar manualmente o número de peças e compras deste cliente.</p>
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline" onclick="App.closeModal('modalCliente')">Cancelar</button>
@@ -227,6 +239,8 @@
       document.getElementById('codigoCliente').value = '';
       document.getElementById('noGrupoWhatsapp').value = 'false';
       document.getElementById('estado').value = 'activo';
+      document.getElementById('totalPecas').value = '0';
+      document.getElementById('totalCompras').value = '0';
       App.openModal('modalCliente');
     }
 
@@ -240,6 +254,8 @@
       document.getElementById('codigoCliente').value = c.codigoCliente || '';
       document.getElementById('noGrupoWhatsapp').value = c.noGrupoWhatsapp ? 'true' : 'false';
       document.getElementById('estado').value = c.estado || 'activo';
+      document.getElementById('totalPecas').value = c.totalPecas || 0;
+      document.getElementById('totalCompras').value = c.totalCompras || 0;
       App.openModal('modalCliente');
     }
 
@@ -255,7 +271,9 @@
         telefone,
         codigoCliente: document.getElementById('codigoCliente').value.trim(),
         noGrupoWhatsapp: document.getElementById('noGrupoWhatsapp').value === 'true',
-        estado: document.getElementById('estado').value
+        estado: document.getElementById('estado').value,
+        totalPecas: parseInt(document.getElementById('totalPecas').value, 10) || 0,
+        totalCompras: parseInt(document.getElementById('totalCompras').value, 10) || 0
       };
       try {
         if (editId) {

@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-
   <script>
-    /* Base path automático para GitHub Pages (repo em subpasta) */
     (function () {
       try {
         var path = location.pathname;
@@ -16,13 +14,45 @@
       } catch (e) {}
     })();
   </script>
-
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Relatórios — Bónus Lodja - Compre e ganhe</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    .filtros-bar {
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; margin-bottom: 20px;
+    }
+    .filtros-bar .form-group { margin: 0; min-width: 140px; }
+    .filtros-bar label { font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px; }
+    .charts-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px; margin-bottom: 24px;
+    }
+    .chart-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px;
+    }
+    .chart-card h3 { font-size: 15px; margin-bottom: 16px; color: var(--text); }
+    .chart-wrap { position: relative; height: 260px; }
+    .stats-row {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px; margin-bottom: 20px;
+    }
+    .stat-mini {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px;
+    }
+    .stat-mini .label { font-size: 12px; color: var(--text-muted); }
+    .stat-mini .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+    .stat-mini .value.success { color: #10b981; }
+    .stat-mini .value.warning { color: #f59e0b; }
+    .stat-mini .value.info { color: #3b82f6; }
+  </style>
 </head>
 <body>
   <div class="admin-layout">
@@ -40,6 +70,7 @@
         <a href="premios.html" class="nav-item"><span class="icon">🎁</span> Prémios</a>
         <a href="entregas.html" class="nav-item"><span class="icon">📦</span> Entregas</a>
         <a href="relatorios.html" class="nav-item active"><span class="icon">📈</span> Relatórios</a>
+        <a href="bonus-especial.html" class="nav-item" target="_blank"><span class="icon">🔥</span> Bónus Especial</a>
         <a href="configuracoes.html" class="nav-item"><span class="icon">⚙️</span> Configurações</a>
       </nav>
       <div class="sidebar-footer">
@@ -54,43 +85,96 @@
           <button class="menu-toggle">☰</button>
           <h2>Relatórios</h2>
         </div>
-        <div class="topbar-actions" style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="exportarRelatorioExcel()">⬇ Excel</button>
-          <button class="btn btn-outline btn-sm" onclick="exportarRelatorioPDF()">⬇ PDF</button>
-        </div>
       </header>
 
       <div class="content">
-        <div class="stats-grid" id="stats"></div>
+        <!-- Filtros -->
+        <div class="filtros-bar">
+          <div class="form-group">
+            <label>Período</label>
+            <select id="filtroPeriodo" class="form-control">
+              <option value="tudo">Tudo</option>
+              <option value="mes" selected>Este mês</option>
+              <option value="mes_ant">Mês anterior</option>
+              <option value="3m">Últimos 3 meses</option>
+              <option value="6m">Últimos 6 meses</option>
+              <option value="ano">Este ano</option>
+              <option value="custom">Personalizado</option>
+            </select>
+          </div>
+          <div class="form-group" id="wrapMes" style="display:none">
+            <label>Mês</label>
+            <select id="filtroMes" class="form-control">
+              <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+              <option value="3">Março</option><option value="4">Abril</option>
+              <option value="5">Maio</option><option value="6">Junho</option>
+              <option value="7">Julho</option><option value="8">Agosto</option>
+              <option value="9">Setembro</option><option value="10">Outubro</option>
+              <option value="11">Novembro</option><option value="12">Dezembro</option>
+            </select>
+          </div>
+          <div class="form-group" id="wrapAno" style="display:none">
+            <label>Ano</label>
+            <select id="filtroAno" class="form-control"></select>
+          </div>
+          <div class="form-group" id="wrapDe" style="display:none">
+            <label>De</label>
+            <input type="date" id="filtroDe" class="form-control">
+          </div>
+          <div class="form-group" id="wrapAte" style="display:none">
+            <label>Até</label>
+            <input type="date" id="filtroAte" class="form-control">
+          </div>
+          <button class="btn btn-primary" onclick="render()">Aplicar</button>
+        </div>
 
+        <!-- KPIs -->
+        <div class="stats-row" id="kpis"></div>
+
+        <!-- Gráficos -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <h3>Compras por dia / mês</h3>
+            <div class="chart-wrap"><canvas id="chartCompras"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h3>Valor das compras (MT)</h3>
+            <div class="chart-wrap"><canvas id="chartValor"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h3>Peças vendidas</h3>
+            <div class="chart-wrap"><canvas id="chartPecas"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h3>Distribuição de prémios</h3>
+            <div class="chart-wrap"><canvas id="chartPremios"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h3>Sorteios no período</h3>
+            <div class="chart-wrap"><canvas id="chartSorteios"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h3>Estado dos prémios</h3>
+            <div class="chart-wrap"><canvas id="chartEstado"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Tabelas -->
         <div class="card mt-3">
-          <div class="card-header"><h3>Distribuição de Prémios</h3></div>
-          <div class="card-body">
-            <table>
-              <thead>
-                <tr>
-                  <th>Prémio</th>
-                  <th>Quantidade</th>
-                  <th>Percentagem</th>
-                </tr>
-              </thead>
-              <tbody id="distPremios"></tbody>
+          <div class="card-header"><h3>Top clientes (peças no período)</h3></div>
+          <div class="card-body" style="padding:0;overflow-x:auto">
+            <table class="table">
+              <thead><tr><th>#</th><th>Cliente</th><th>Telefone</th><th>Peças</th><th>Compras</th><th>Valor (MT)</th></tr></thead>
+              <tbody id="topClientes"></tbody>
             </table>
           </div>
         </div>
 
         <div class="card mt-3">
-          <div class="card-header"><h3>Histórico Completo (últimos 20)</h3></div>
-          <div class="card-body">
-            <table>
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>Evento</th>
-                  <th>Detalhe</th>
-                  <th>Data</th>
-                </tr>
-              </thead>
+          <div class="card-header"><h3>Histórico de eventos</h3></div>
+          <div class="card-body" style="padding:0;overflow-x:auto">
+            <table class="table">
+              <thead><tr><th>Cliente</th><th>Evento</th><th>Detalhe</th><th>Data</th></tr></thead>
               <tbody id="historico"></tbody>
             </table>
           </div>
@@ -100,184 +184,274 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="supabase-config.js"></script>
   <script src="storage.js"></script>
   <script src="auth.js"></script>
   <script src="app.js"></script>
   <script>
     initSupabase();
-    if (!Auth.requireAuth()) throw new Error("Não autenticado");
+    if (!Auth.requireAuth()) throw new Error('Não autenticado');
 
+    const charts = {};
+    const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-    async function exportarRelatorioExcel() {
-      try {
-        if (typeof XLSX === 'undefined') {
-          App.toast('Biblioteca Excel não carregou', 'error');
-          return;
-        }
-        const [stats, sorteios, clientes] = await Promise.all([
-          Storage.getStats(), Storage.getSorteios(), Storage.getClientes()
-        ]);
+    // Anos no filtro
+    (function fillYears() {
+      const y = new Date().getFullYear();
+      const sel = document.getElementById('filtroAno');
+      for (let i = y; i >= y - 5; i--) {
+        const o = document.createElement('option');
+        o.value = i; o.textContent = i;
+        if (i === y) o.selected = true;
+        sel.appendChild(o);
+      }
+      document.getElementById('filtroMes').value = String(new Date().getMonth() + 1);
+    })();
 
-        const wb = XLSX.utils.book_new();
-
-        // Resumo
-        const resumo = [
-          ['Relatório — Bónus Lodja - Compre e ganhe'],
-          ['Data', new Date().toLocaleString('pt-PT')],
-          [],
-          ['Indicador', 'Valor'],
-          ['Total Clientes', stats.totalClientes],
-          ['Total Compras', stats.totalCompras],
-          ['Total Peças', stats.totalPecas],
-          ['Sorteios realizados', stats.sorteiosRealizados],
-          ['Prémios pendentes', stats.premiosPendentes],
-          ['Prémios entregues', stats.premiosEntregues],
-          ['Clientes elegíveis', stats.clientesElegiveis]
-        ];
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
-
-        // Clientes
-        const cliRows = [['Nome', 'Telefone', 'Peças', 'Grupo WA', 'Elegível', 'Estado']];
-        clientes.forEach(c => {
-          cliRows.push([
-            c.nome || '', c.telefone || '', c.totalPecas || 0,
-            c.noGrupoWhatsapp ? 'Sim' : 'Não',
-            c.elegivel ? 'Sim' : 'Não',
-            c.estado || ''
-          ]);
-        });
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cliRows), 'Clientes');
-
-        // Sorteios
-        const sortRows = [['Cliente', 'Telefone', 'Prémio', 'Código', 'Data', 'Estado']];
-        sorteios.forEach(s => {
-          sortRows.push([
-            s.clienteNome || '', s.clienteTelefone || '', s.premioNome || '',
-            s.codigo || '', s.dataSorteio || '', s.estado || ''
-          ]);
-        });
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sortRows), 'Sorteios');
-
-        XLSX.writeFile(wb, 'relatorio-bonus-loja.xlsx');
-        App.toast('Relatório Excel descarregado!', 'success');
-      } catch (e) {
-        console.error(e);
-        App.toast('Erro ao exportar Excel: ' + (e.message || e), 'error');
+    document.getElementById('filtroPeriodo').addEventListener('change', syncFiltroUI);
+    function syncFiltroUI() {
+      const v = document.getElementById('filtroPeriodo').value;
+      document.getElementById('wrapMes').style.display = v === 'custom' ? 'block' : 'none';
+      document.getElementById('wrapAno').style.display = v === 'custom' ? 'block' : 'none';
+      document.getElementById('wrapDe').style.display = v === 'custom' ? 'block' : 'none';
+      document.getElementById('wrapAte').style.display = v === 'custom' ? 'block' : 'none';
+      // Para custom simples usamos mês+ano OU datas — se datas preenchidas usam-se datas
+      if (v === 'custom') {
+        document.getElementById('wrapMes').style.display = 'block';
+        document.getElementById('wrapAno').style.display = 'block';
       }
     }
 
-    async function exportarRelatorioPDF() {
-      try {
-        const [stats, sorteios, clientes] = await Promise.all([
-          Storage.getStats(), Storage.getSorteios(), Storage.getClientes()
-        ]);
+    function rangeFromFilter() {
+      const v = document.getElementById('filtroPeriodo').value;
+      const now = new Date();
+      let inicio = null, fim = null;
 
-        const elegiveis = clientes.filter(c => c.elegivel).length;
-        const win = window.open('', '_blank');
-        if (!win) {
-          App.toast('Permita pop-ups para gerar o PDF', 'warning');
-          return;
+      if (v === 'tudo') return { inicio: null, fim: null };
+
+      if (v === 'mes') {
+        inicio = new Date(now.getFullYear(), now.getMonth(), 1);
+        fim = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      } else if (v === 'mes_ant') {
+        inicio = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        fim = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      } else if (v === '3m') {
+        inicio = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        fim = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      } else if (v === '6m') {
+        inicio = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        fim = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      } else if (v === 'ano') {
+        inicio = new Date(now.getFullYear(), 0, 1);
+        fim = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+      } else if (v === 'custom') {
+        const de = document.getElementById('filtroDe').value;
+        const ate = document.getElementById('filtroAte').value;
+        if (de && ate) {
+          inicio = new Date(de + 'T00:00:00');
+          fim = new Date(ate + 'T23:59:59');
+        } else {
+          const m = parseInt(document.getElementById('filtroMes').value, 10) - 1;
+          const y = parseInt(document.getElementById('filtroAno').value, 10);
+          inicio = new Date(y, m, 1);
+          fim = new Date(y, m + 1, 0, 23, 59, 59);
         }
-
-        const sortHtml = sorteios.slice(0, 50).map(s =>
-          `<tr><td>${s.clienteNome || ''}</td><td>${s.premioNome || ''}</td><td>${s.codigo || ''}</td><td>${s.estado || ''}</td></tr>`
-        ).join('') || '<tr><td colspan="4">Sem sorteios</td></tr>';
-
-        const cliHtml = clientes.map(c =>
-          `<tr><td>${c.nome || ''}</td><td>${c.telefone || ''}</td><td>${c.totalPecas || 0}</td><td>${c.elegivel ? 'Sim' : 'Não'}</td></tr>`
-        ).join('');
-
-        win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório</title>
-          <style>
-            body{font-family:Arial,sans-serif;padding:24px;color:#111}
-            h1{font-size:20px;margin:0 0 8px}
-            h2{font-size:16px;margin:24px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px}
-            .meta{color:#555;font-size:12px;margin-bottom:20px}
-            .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
-            .card{border:1px solid #ddd;border-radius:8px;padding:12px}
-            .card b{display:block;font-size:20px}
-            table{width:100%;border-collapse:collapse;font-size:12px}
-            th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}
-            th{background:#f5f5f5}
-            @media print{button{display:none}}
-          </style></head><body>
-          <h1>Relatório — Bónus Lodja - Compre e ganhe</h1>
-          <div class="meta">Gerado em ${new Date().toLocaleString('pt-PT')}</div>
-          <div class="grid">
-            <div class="card">Clientes<b>${stats.totalClientes}</b></div>
-            <div class="card">Elegíveis<b>${stats.clientesElegiveis}</b></div>
-            <div class="card">Sorteios<b>${stats.sorteiosRealizados}</b></div>
-            <div class="card">Peças<b>${stats.totalPecas}</b></div>
-            <div class="card">Pendentes<b>${stats.premiosPendentes}</b></div>
-            <div class="card">Entregues<b>${stats.premiosEntregues}</b></div>
-          </div>
-          <h2>Clientes</h2>
-          <table><thead><tr><th>Nome</th><th>Telefone</th><th>Peças</th><th>Elegível</th></tr></thead>
-          <tbody>${cliHtml}</tbody></table>
-          <h2>Sorteios</h2>
-          <table><thead><tr><th>Cliente</th><th>Prémio</th><th>Código</th><th>Estado</th></tr></thead>
-          <tbody>${sortHtml}</tbody></table>
-          <p style="margin-top:24px"><button onclick="window.print()">Imprimir / Guardar como PDF</button></p>
-          <script>setTimeout(function(){window.print()},400)<\/script>
-          </body></html>`);
-        win.document.close();
-        App.toast('Janela de PDF aberta — use Guardar como PDF', 'success');
-      } catch (e) {
-        console.error(e);
-        App.toast('Erro ao gerar PDF: ' + (e.message || e), 'error');
       }
+      return { inicio, fim };
+    }
+
+    function inRange(dateStr, inicio, fim) {
+      if (!dateStr) return false;
+      if (!inicio && !fim) return true;
+      const d = new Date(dateStr);
+      if (isNaN(d)) return false;
+      if (inicio && d < inicio) return false;
+      if (fim && d > fim) return false;
+      return true;
+    }
+
+    function bucketKey(dateStr, inicio, fim) {
+      const d = new Date(dateStr);
+      if (isNaN(d)) return '—';
+      // Se o intervalo for <= 45 dias, agrupar por dia; senão por mês
+      const span = (inicio && fim) ? (fim - inicio) / (1000 * 60 * 60 * 24) : 365;
+      if (span <= 45) {
+        return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
+      }
+      return MESES[d.getMonth()] + ' ' + d.getFullYear();
+    }
+
+    function destroyChart(id) {
+      if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+    }
+
+    function makeChart(id, type, labels, datasets, opts = {}) {
+      destroyChart(id);
+      const ctx = document.getElementById(id).getContext('2d');
+      charts[id] = new Chart(ctx, {
+        type,
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#94a3b8' } },
+            ...opts.plugins
+          },
+          scales: type === 'doughnut' || type === 'pie' ? {} : {
+            x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.5)' } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.5)' }, beginAtZero: true }
+          }
+        }
+      });
     }
 
     async function render() {
-      const s = await Storage.getStats();
-      document.getElementById('stats').innerHTML = `
-        <div class="stat-card"><div class="label">Total Clientes</div><div class="value primary">${s.totalClientes}</div></div>
-        <div class="stat-card"><div class="label">Total Compras</div><div class="value">${s.totalCompras}</div></div>
-        <div class="stat-card"><div class="label">Total Peças</div><div class="value">${s.totalPecas}</div></div>
-        <div class="stat-card"><div class="label">Sorteios</div><div class="value info">${s.sorteiosRealizados}</div></div>
-        <div class="stat-card"><div class="label">Pendentes</div><div class="value warning">${s.premiosPendentes}</div></div>
-        <div class="stat-card"><div class="label">Entregues</div><div class="value success">${s.premiosEntregues}</div></div>
+      const { inicio, fim } = rangeFromFilter();
+      const [compras, sorteios, clientes] = await Promise.all([
+        Storage.getCompras(),
+        Storage.getSorteios(),
+        Storage.getClientes()
+      ]);
+
+      const comprasF = compras.filter(c => inRange(c.data || c.created_at, inicio, fim));
+      const sorteiosF = sorteios.filter(s => inRange(s.dataSorteio || s.created_at, inicio, fim));
+
+      const totalCompras = comprasF.length;
+      const totalPecas = comprasF.reduce((s, c) => s + (c.quantidadePecas || 0), 0);
+      const totalValor = comprasF.reduce((s, c) => s + (parseFloat(c.valor) || 0), 0);
+      const ticketMedio = totalCompras ? totalValor / totalCompras : 0;
+      const pendentes = sorteiosF.filter(s => (s.estado || '') === 'premio_pendente').length;
+      const entregues = sorteiosF.filter(s => (s.estado || '') === 'premio_entregue' || s.dataEntrega).length;
+
+      document.getElementById('kpis').innerHTML = `
+        <div class="stat-mini"><div class="label">Compras</div><div class="value info">${totalCompras}</div></div>
+        <div class="stat-mini"><div class="label">Peças</div><div class="value">${totalPecas}</div></div>
+        <div class="stat-mini"><div class="label">Valor total (MT)</div><div class="value success">${totalValor.toLocaleString('pt-PT', { minimumFractionDigits: 0 })}</div></div>
+        <div class="stat-mini"><div class="label">Ticket médio</div><div class="value">${ticketMedio.toLocaleString('pt-PT', { maximumFractionDigits: 0 })}</div></div>
+        <div class="stat-mini"><div class="label">Sorteios</div><div class="value info">${sorteiosF.length}</div></div>
+        <div class="stat-mini"><div class="label">Prémios pendentes</div><div class="value warning">${pendentes}</div></div>
+        <div class="stat-mini"><div class="label">Prémios entregues</div><div class="value success">${entregues}</div></div>
+        <div class="stat-mini"><div class="label">Clientes activos</div><div class="value">${clientes.filter(c => c.estado === 'activo').length}</div></div>
       `;
 
-      const sorteios = await Storage.getSorteios();
-      const contagem = {};
-      sorteios.forEach(x => {
-        contagem[x.premioNome] = (contagem[x.premioNome] || 0) + 1;
+      // Séries temporais
+      const mapQtd = {}, mapValor = {}, mapPecas = {}, mapSorteios = {};
+      comprasF.forEach(c => {
+        const k = bucketKey(c.data || c.created_at, inicio, fim);
+        mapQtd[k] = (mapQtd[k] || 0) + 1;
+        mapValor[k] = (mapValor[k] || 0) + (parseFloat(c.valor) || 0);
+        mapPecas[k] = (mapPecas[k] || 0) + (c.quantidadePecas || 0);
       });
-      const total = sorteios.length || 1;
-      const distBody = document.getElementById('distPremios');
-      const entries = Object.entries(contagem);
-      distBody.innerHTML = entries.length
-        ? entries.map(([nome, qtd]) => `
-            <tr>
-              <td>${App.escapeHtml(nome)}</td>
-              <td>${qtd}</td>
-              <td>${((qtd / total) * 100).toFixed(1)}%</td>
-            </tr>`).join('')
-        : '<tr><td colspan="3" class="text-center text-muted">Ainda sem sorteios — a distribuição aparece depois dos clientes girarem a roleta</td></tr>';
+      sorteiosF.forEach(s => {
+        const k = bucketKey(s.dataSorteio || s.created_at, inicio, fim);
+        mapSorteios[k] = (mapSorteios[k] || 0) + 1;
+      });
 
-      const historico = [];
-      const clientes = await Storage.getClientes();
-      clientes.forEach(c => {
-        if (c.dataCadastro) historico.push({ cliente: c.nome, evento: 'Cadastro', detalhe: (c.totalPecas || 0) + ' peças', data: c.dataCadastro });
-        if (c.dataTokenGerado) historico.push({ cliente: c.nome, evento: 'Link gerado', detalhe: c.token || '', data: c.dataTokenGerado });
-        if (c.dataSorteio) historico.push({ cliente: c.nome, evento: 'Sorteio', detalhe: (c.ultimoPremio || '') + ' (' + (c.ultimoCodigo || '') + ')', data: c.dataSorteio });
+      const labels = [...new Set([
+        ...Object.keys(mapQtd), ...Object.keys(mapValor),
+        ...Object.keys(mapPecas), ...Object.keys(mapSorteios)
+      ])];
+
+      makeChart('chartCompras', 'bar', labels, [{
+        label: 'Nº compras',
+        data: labels.map(l => mapQtd[l] || 0),
+        backgroundColor: 'rgba(99,102,241,0.7)',
+        borderRadius: 6
+      }]);
+      makeChart('chartValor', 'line', labels, [{
+        label: 'Valor (MT)',
+        data: labels.map(l => mapValor[l] || 0),
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16,185,129,0.15)',
+        fill: true,
+        tension: 0.3
+      }]);
+      makeChart('chartPecas', 'bar', labels, [{
+        label: 'Peças',
+        data: labels.map(l => mapPecas[l] || 0),
+        backgroundColor: 'rgba(245,158,11,0.75)',
+        borderRadius: 6
+      }]);
+      makeChart('chartSorteios', 'line', labels, [{
+        label: 'Sorteios',
+        data: labels.map(l => mapSorteios[l] || 0),
+        borderColor: '#ec4899',
+        backgroundColor: 'rgba(236,72,153,0.12)',
+        fill: true,
+        tension: 0.3
+      }]);
+
+      // Prémios
+      const contagem = {};
+      sorteiosF.forEach(s => {
+        const n = s.premioNome || 'Sem nome';
+        contagem[n] = (contagem[n] || 0) + 1;
       });
-      sorteios.forEach(x => {
-        if (x.dataEntrega) historico.push({ cliente: x.clienteNome, evento: 'Prémio entregue', detalhe: x.codigo, data: x.dataEntrega });
+      const premLabels = Object.keys(contagem);
+      const premColors = ['#FF1744','#FF9100','#FFD600','#00E676','#00B0FF','#D500F9','#FF4081','#651FFF'];
+      makeChart('chartPremios', 'doughnut', premLabels.length ? premLabels : ['Sem dados'], [{
+        data: premLabels.length ? premLabels.map(k => contagem[k]) : [1],
+        backgroundColor: premLabels.length ? premLabels.map((_, i) => premColors[i % premColors.length]) : ['#334155']
+      }]);
+
+      makeChart('chartEstado', 'doughnut', ['Pendentes', 'Entregues'], [{
+        data: [pendentes, entregues],
+        backgroundColor: ['#f59e0b', '#10b981']
+      }]);
+
+      // Top clientes no período
+      const byCli = {};
+      comprasF.forEach(c => {
+        const id = c.clienteId || '—';
+        if (!byCli[id]) byCli[id] = { pecas: 0, compras: 0, valor: 0 };
+        byCli[id].pecas += c.quantidadePecas || 0;
+        byCli[id].compras += 1;
+        byCli[id].valor += parseFloat(c.valor) || 0;
+      });
+      const cliMap = {};
+      clientes.forEach(c => { cliMap[c.id] = c; });
+      const top = Object.entries(byCli)
+        .map(([id, v]) => ({ id, ...v, nome: (cliMap[id] && cliMap[id].nome) || id, tel: (cliMap[id] && cliMap[id].telefone) || '' }))
+        .sort((a, b) => b.pecas - a.pecas)
+        .slice(0, 15);
+
+      document.getElementById('topClientes').innerHTML = top.length
+        ? top.map((c, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${App.escapeHtml(c.nome)}</td>
+            <td>${App.escapeHtml(c.tel || '—')}</td>
+            <td>${c.pecas}</td>
+            <td>${c.compras}</td>
+            <td>${c.valor.toLocaleString('pt-PT', { maximumFractionDigits: 0 })}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="6" class="text-center text-muted">Sem compras neste período</td></tr>';
+
+      // Histórico
+      const historico = [];
+      clientes.forEach(c => {
+        if (inRange(c.dataCadastro, inicio, fim))
+          historico.push({ cliente: c.nome, evento: 'Cadastro', detalhe: (c.totalPecas || 0) + ' peças', data: c.dataCadastro });
+        if (inRange(c.dataTokenGerado, inicio, fim))
+          historico.push({ cliente: c.nome, evento: 'Link gerado', detalhe: c.token || '', data: c.dataTokenGerado });
+        if (inRange(c.dataSorteio, inicio, fim))
+          historico.push({ cliente: c.nome, evento: 'Sorteio', detalhe: (c.ultimoPremio || '') + ' (' + (c.ultimoCodigo || '') + ')', data: c.dataSorteio });
+      });
+      sorteiosF.forEach(x => {
+        if (x.dataEntrega && inRange(x.dataEntrega, inicio, fim))
+          historico.push({ cliente: x.clienteNome, evento: 'Prémio entregue', detalhe: x.codigo, data: x.dataEntrega });
       });
       historico.sort((a, b) => new Date(b.data) - new Date(a.data));
 
-      document.getElementById('historico').innerHTML = historico.slice(0, 30).map(h => `
+      document.getElementById('historico').innerHTML = historico.slice(0, 40).map(h => `
         <tr>
-          <td>${App.escapeHtml(h.cliente)}</td>
+          <td>${App.escapeHtml(h.cliente || '—')}</td>
           <td>${h.evento}</td>
           <td>${App.escapeHtml(h.detalhe || '—')}</td>
           <td>${App.formatDateTime(h.data)}</td>
         </tr>
-      `).join('') || '<tr><td colspan="4" class="text-center text-muted">Sem histórico ainda</td></tr>';
+      `).join('') || '<tr><td colspan="4" class="text-center text-muted">Sem eventos neste período</td></tr>';
     }
 
     render();

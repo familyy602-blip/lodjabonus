@@ -102,11 +102,11 @@ CREATE POLICY "Permitir tudo config" ON config FOR ALL USING (true) WITH CHECK (
 -- Prémios padrão
 -- =====================================================
 INSERT INTO premios (id, nome, descricao, probabilidade, activo, cor) VALUES
-  ('p1', '10% de bónus na próxima compra', 'Ganhou 10% de desconto/bónus na próxima compra', 40, true, '#4CAF50'),
-  ('p2', '25% de bónus na próxima compra', 'Ganhou 25% de desconto/bónus na próxima compra', 30, true, '#2196F3'),
-  ('p3', '50% de bónus na próxima compra', 'Ganhou 50% de desconto/bónus na próxima compra', 15, true, '#9C27B0'),
-  ('p4', 'Paga 1 e leva 2', 'Na próxima compra paga 1 e leva 2', 10, true, '#FF9800'),
-  ('p5', 'Peça grátis', 'Ganhou uma peça grátis', 5, true, '#E91E63')
+  ('p1', '10% de bónus na próxima compra', 'Ganhou 10% de desconto/bónus na próxima compra', 40, true, '#00E676'),
+  ('p2', '25% de bónus na próxima compra', 'Ganhou 25% de desconto/bónus na próxima compra', 30, true, '#00B0FF'),
+  ('p3', '50% de bónus na próxima compra', 'Ganhou 50% de desconto/bónus na próxima compra', 15, true, '#D500F9'),
+  ('p4', 'Paga 1 e leva 2', 'Na próxima compra paga 1 e leva 2', 10, true, '#FF9100'),
+  ('p5', 'Peça grátis', 'Ganhou uma peça grátis', 5, true, '#FF1744')
 ON CONFLICT (id) DO NOTHING;
 
 -- Config padrão

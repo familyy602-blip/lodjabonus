@@ -88,6 +88,31 @@ const App = {
     }
   },
 
+
+  // Aplicar logo da loja no ícone B do menu
+  applyLogo(logoUrl) {
+    document.querySelectorAll('.sidebar-header .logo, .logo-big').forEach(el => {
+      if (logoUrl) {
+        el.style.backgroundImage = `url(${logoUrl})`;
+        el.style.backgroundSize = 'cover';
+        el.style.backgroundPosition = 'center';
+        el.textContent = '';
+        el.classList.add('has-logo');
+      } else {
+        el.style.backgroundImage = '';
+        el.classList.remove('has-logo');
+        if (!el.textContent.trim()) el.textContent = 'B';
+      }
+    });
+  },
+
+  async loadAndApplyLogo() {
+    try {
+      if (typeof Storage === 'undefined' || !Storage.getConfig) return;
+      const cfg = await Storage.getConfig();
+      if (cfg && cfg.logoUrl) this.applyLogo(cfg.logoUrl);
+    } catch (e) { /* silencioso */ }
+  },
   // Sidebar mobile
   initSidebar() {
     const toggle = document.querySelector('.menu-toggle');
@@ -141,4 +166,6 @@ window.App = App;
 // Inicializar sidebar em todas as páginas admin
 document.addEventListener('DOMContentLoaded', () => {
   App.initSidebar();
+  // Aguardar scripts de storage se existirem
+  setTimeout(() => App.loadAndApplyLogo(), 300);
 });

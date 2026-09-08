@@ -683,3 +683,11 @@ textarea.form-control {
 .flex-wrap { flex-wrap: wrap; }
 .w-100 { width: 100%; }
 .hidden { display: none !important; }
+
+
+/* Logo com imagem de avatar */
+.sidebar-header .logo.has-logo,
+.logo-big.has-logo {
+  background-color: transparent !important;
+  overflow: hidden;
+}

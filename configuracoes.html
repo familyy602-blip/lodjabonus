@@ -40,6 +40,7 @@
         <a href="premios.html" class="nav-item"><span class="icon">🎁</span> Prémios</a>
         <a href="entregas.html" class="nav-item"><span class="icon">📦</span> Entregas</a>
         <a href="relatorios.html" class="nav-item"><span class="icon">📈</span> Relatórios</a>
+        <a href="bonus-especial.html" class="nav-item" target="_blank"><span class="icon">🔥</span> Bónus Especial</a>
         <a href="configuracoes.html" class="nav-item active"><span class="icon">⚙️</span> Configurações</a>
       </nav>
       <div class="sidebar-footer">
@@ -72,7 +73,44 @@
               <label>Nova palavra-passe do admin</label>
               <input type="password" id="adminPassword" class="form-control" placeholder="Deixe em branco para não alterar">
             </div>
+            <div class="form-group">
+              <label>Logo / Avatar da loja</label>
+              <p class="text-muted" style="font-size:12px;margin-bottom:8px">Aparece no ícone <strong>B</strong> no topo do menu lateral.</p>
+              <input type="file" id="logoFile" accept="image/*" class="form-control" style="max-width:320px">
+              <div id="logoPreviewWrap" style="margin-top:12px;display:none;align-items:center;gap:12px" class="d-flex">
+                <img id="logoPreview" alt="Logo" style="width:56px;height:56px;border-radius:12px;object-fit:cover;border:1px solid #334155;background:#0f172a">
+                <button type="button" class="btn btn-outline btn-sm" onclick="removerLogo()">Remover logo</button>
+              </div>
+            </div>
             <button class="btn btn-primary" onclick="salvarConfig()">Guardar Configurações</button>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header"><h3>Bónus especial (promoção temporária)</h3></div>
+          <div class="card-body" style="padding:20px">
+            <p class="text-muted" style="margin-bottom:14px">Oferta para quem fizer uma compra. Pode activar ou desactivar quando quiser — não precisa estar sempre disponível.</p>
+            <div class="form-group">
+              <label>Estado</label>
+              <select id="bonusEspecialActivo" class="form-control" style="max-width:220px">
+                <option value="false">Desactivado</option>
+                <option value="true">Activo (visível ao público)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Título do bónus</label>
+              <input type="text" id="bonusEspecialNome" class="form-control" placeholder="Ex: 15% extra nesta semana">
+            </div>
+            <div class="form-group">
+              <label>Descrição / condições</label>
+              <textarea id="bonusEspecialDesc" class="form-control" rows="3" placeholder="Ex: Válido em compras acima de 500 MT. Apresente este código no balcão."></textarea>
+            </div>
+            <div class="form-group">
+              <label>Código promocional (opcional)</label>
+              <input type="text" id="bonusEspecialCodigo" class="form-control" placeholder="Ex: LODJA15" style="max-width:240px">
+            </div>
+            <p class="text-muted" style="font-size:12px">Página pública: <code>bonus-especial.html</code> — partilhe o link só quando estiver activo.</p>
+            <button class="btn btn-primary" onclick="salvarConfig()">Guardar Bónus Especial</button>
           </div>
         </div>
 
@@ -106,10 +144,52 @@
     initSupabase();
     if (!Auth.requireAuth()) throw new Error("Não autenticado");
 
+    let logoDataUrl = null;
+
+    function showLogoPreview(url) {
+      const wrap = document.getElementById('logoPreviewWrap');
+      const img = document.getElementById('logoPreview');
+      if (url) {
+        img.src = url;
+        wrap.style.display = 'flex';
+        logoDataUrl = url;
+      } else {
+        wrap.style.display = 'none';
+        img.removeAttribute('src');
+        logoDataUrl = null;
+      }
+    }
+
+    function removerLogo() {
+      document.getElementById('logoFile').value = '';
+      showLogoPreview(null);
+      logoDataUrl = '';
+    }
+
+    document.getElementById('logoFile').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (file.size > 800 * 1024) {
+        App.toast('Imagem demasiado grande. Use até ~800 KB.', 'error');
+        e.target.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => showLogoPreview(reader.result);
+      reader.readAsDataURL(file);
+    });
+
     (async () => {
       const config = await Storage.getConfig();
       document.getElementById('nomeLoja').value = config.nomeLoja || '';
       document.getElementById('pecasNecessarias').value = config.pecasNecessarias || 5;
+      if (config.logoUrl) showLogoPreview(config.logoUrl);
+      const be = config.bonusEspecial || {};
+      document.getElementById('bonusEspecialActivo').value = be.activo ? 'true' : 'false';
+      document.getElementById('bonusEspecialNome').value = be.nome || '';
+      document.getElementById('bonusEspecialDesc').value = be.descricao || '';
+      document.getElementById('bonusEspecialCodigo').value = be.codigo || '';
+      if (window.App && App.applyLogo) App.applyLogo(config.logoUrl);
     })();
 
     async function salvarConfig() {
@@ -118,9 +198,18 @@
       cfg.pecasNecessarias = parseInt(document.getElementById('pecasNecessarias').value) || 5;
       const novaPass = document.getElementById('adminPassword').value;
       if (novaPass) cfg.adminPassword = novaPass;
+      if (logoDataUrl === '') cfg.logoUrl = null;
+      else if (logoDataUrl) cfg.logoUrl = logoDataUrl;
+      cfg.bonusEspecial = {
+        activo: document.getElementById('bonusEspecialActivo').value === 'true',
+        nome: document.getElementById('bonusEspecialNome').value.trim(),
+        descricao: document.getElementById('bonusEspecialDesc').value.trim(),
+        codigo: document.getElementById('bonusEspecialCodigo').value.trim()
+      };
       await Storage.saveConfig(cfg);
       App.toast('Configurações guardadas!', 'success');
       document.getElementById('adminPassword').value = '';
+      if (App.applyLogo) App.applyLogo(cfg.logoUrl);
     }
 
     async function seedDemo() {
