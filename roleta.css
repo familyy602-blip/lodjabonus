@@ -353,3 +353,42 @@
   line-height: 1.15;
   pointer-events: none;
 }
+
+
+/* MOBILE ROLETA */
+@media (max-width: 600px) {
+  .roleta-page {
+    padding: 12px 10px 24px;
+    min-height: 100dvh;
+  }
+  .roleta-header h1 {
+    font-size: 22px;
+  }
+  .wheel-wrapper {
+    width: min(300px, 88vw);
+    height: min(300px, 88vw);
+  }
+  .btn-girar {
+    width: 100%;
+    max-width: 320px;
+    min-height: 52px;
+    font-size: 17px;
+    padding: 14px 20px;
+  }
+  .acesso-form {
+    width: 100%;
+    max-width: 100%;
+    padding: 20px 16px;
+  }
+  .wheel-label {
+    font-size: 9px;
+    width: 72px;
+    margin-left: -36px;
+  }
+}
+@media (max-width: 380px) {
+  .wheel-wrapper {
+    width: 260px;
+    height: 260px;
+  }
+}

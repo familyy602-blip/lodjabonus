@@ -120,13 +120,30 @@ const App = {
     const overlay = document.querySelector('.sidebar-overlay');
     if (!toggle || !sidebar) return;
 
-    toggle.addEventListener('click', () => {
-      sidebar.classList.toggle('open');
-      overlay?.classList.toggle('show');
-    });
-    overlay?.addEventListener('click', () => {
+    const close = () => {
       sidebar.classList.remove('open');
-      overlay.classList.remove('show');
+      overlay?.classList.remove('show');
+      document.body.style.overflow = '';
+    };
+    const open = () => {
+      sidebar.classList.add('open');
+      overlay?.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    };
+
+    toggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (sidebar.classList.contains('open')) close();
+      else open();
+    });
+    overlay?.addEventListener('click', close);
+    // Fechar menu ao tocar num link (melhor em telemóvel/APK)
+    sidebar.querySelectorAll('a.nav-item').forEach(a => {
+      a.addEventListener('click', () => close());
+    });
+    // Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close();
     });
   },
 

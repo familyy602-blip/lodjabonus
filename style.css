@@ -616,22 +616,131 @@ textarea.form-control {
   background: none;
   border: none;
   color: var(--text);
-  font-size: 24px;
+  font-size: 28px;
   cursor: pointer;
-  padding: 4px;
+  padding: 8px 12px;
+  min-width: 44px;
+  min-height: 44px;
+  line-height: 1;
+  border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
 }
+.menu-toggle:active { background: var(--bg-hover); }
 
 .sidebar-overlay {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.55);
   z-index: 99;
+  touch-action: manipulation;
 }
 
+/* Base: evitar overflow horizontal em qualquer ecrã */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+img, video, canvas, svg {
+  max-width: 100%;
+  height: auto;
+}
+.admin-layout {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+.main-content {
+  max-width: 100%;
+  min-width: 0;
+}
+.topbar-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.topbar-actions .btn {
+  white-space: nowrap;
+}
+/* Tabelas: scroll horizontal suave no telemóvel */
+.card-body,
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+table {
+  min-width: 560px;
+}
+/* Botões touch-friendly */
+.btn {
+  min-height: 44px;
+  padding: 10px 16px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-sm {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.form-control, select.form-control, textarea.form-control {
+  min-height: 44px;
+  font-size: 16px; /* evita zoom automático no iOS */
+  max-width: 100%;
+}
+input[type="date"], input[type="number"], input[type="password"], input[type="text"], input[type="file"] {
+  font-size: 16px;
+  max-width: 100%;
+}
+.nav-item {
+  min-height: 44px;
+  padding: 12px 16px;
+  touch-action: manipulation;
+}
+.modal {
+  max-width: min(500px, calc(100vw - 24px));
+  margin: 12px;
+  max-height: calc(100vh - 24px);
+}
+.modal-overlay {
+  padding: 12px;
+  align-items: flex-start;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.modal-body {
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+.filtros-bar {
+  flex-direction: row;
+}
+.charts-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+.chart-wrap {
+  height: 220px;
+}
+.stats-row, .stats-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+/* ========== TABLET ========== */
+@media (max-width: 1024px) {
+  .content { padding: 16px; }
+  .topbar { padding: 0 16px; height: auto; min-height: var(--header-height); flex-wrap: wrap; gap: 8px; padding-top: 10px; padding-bottom: 10px; }
+}
+
+/* ========== MOBILE / APK ========== */
 @media (max-width: 900px) {
   .sidebar {
     transform: translateX(-100%);
+    width: min(300px, 86vw);
+    box-shadow: 8px 0 32px rgba(0,0,0,0.4);
   }
   .sidebar.open {
     transform: translateX(0);
@@ -640,29 +749,132 @@ textarea.form-control {
     display: block;
   }
   .main-content {
-    margin-left: 0;
+    margin-left: 0 !important;
+    width: 100%;
   }
   .menu-toggle {
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   .form-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
   }
   .stats-grid {
     grid-template-columns: 1fr 1fr;
   }
-}
-
-@media (max-width: 500px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
+  .topbar h2 {
+    font-size: 16px;
   }
-  .content {
-    padding: 16px;
+  .topbar-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .topbar-actions .btn {
+    flex: 1 1 auto;
+    text-align: center;
   }
   .card-header {
     flex-direction: column;
     align-items: stretch;
+  }
+  .search-box, .search-box .form-control {
+    width: 100%;
+    max-width: 100%;
+  }
+  /* Acções nas tabelas: botões empilhados */
+  td .btn {
+    display: inline-flex;
+    margin: 2px 2px;
+  }
+  .stat-card .value {
+    font-size: 22px;
+  }
+  .filtros-bar {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  .filtros-bar .form-group {
+    width: 100%;
+    min-width: 0 !important;
+  }
+  .filtros-bar .form-control,
+  .filtros-bar select {
+    width: 100%;
+  }
+  .filtros-bar .btn {
+    width: 100%;
+  }
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+  .chart-wrap {
+    height: 200px;
+  }
+  .modal {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+  }
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .stats-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .content {
+    padding: 12px;
+  }
+  .stat-card {
+    padding: 14px;
+  }
+  table {
+    font-size: 13px;
+    min-width: 520px;
+  }
+  th, td {
+    padding: 10px 12px;
+  }
+  .sidebar-header h1 {
+    font-size: 14px;
+  }
+  /* Login */
+  .login-card {
+    margin: 12px;
+    padding: 24px 18px !important;
+  }
+}
+
+/* Telemóveis muito estreitos */
+@media (max-width: 380px) {
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+  .btn {
+    font-size: 14px;
+  }
+}
+
+/* Safe areas (notch / barra Android) */
+@supports (padding: max(0px)) {
+  .sidebar {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .main-content {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .topbar {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
   }
 }
 
