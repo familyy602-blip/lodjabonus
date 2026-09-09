@@ -21,7 +21,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"></script>
   <style>
     .filtros-bar {
       display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
@@ -347,98 +347,167 @@
     }
 
 
-    function montarHtmlCorpoRelatorio(dados) {
-      var kpiHtml = dados.kpis.map(function(k) {
-        return '<div style="display:inline-block;min-width:120px;margin:6px 10px 6px 0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px"><div style="font-size:11px;color:#64748b">' + k.label + '</div><div style="font-size:18px;font-weight:700">' + k.value + '</div></div>';
+    function chartToDataUrl(id) {
+      try {
+        if (!charts[id] || !charts[id].canvas) return '';
+        return charts[id].canvas.toDataURL('image/png', 1.0);
+      } catch (e) { return ''; }
+    }
+
+    function montarDocumentoProfissional(dados, opts) {
+      opts = opts || {};
+      var paraImpressao = !!opts.paraImpressao;
+      var esc = function(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      };
+
+      var kpiCards = (dados.kpis || []).map(function(k) {
+        return '<div class="kpi">' +
+          '<div class="kpi-l">' + esc(k.label) + '</div>' +
+          '<div class="kpi-v">' + esc(k.value) + '</div></div>';
       }).join('');
-      var topHtml = dados.topRows.length
-        ? '<table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">#</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Cliente</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Telefone</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Peças</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Compras</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Valor</th></tr></thead><tbody>' +
-          dados.topRows.map(function(r) { return '<tr>' + r.map(function(c) { return '<td style="border:1px solid #e2e8f0;padding:8px">' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'
-        : '<p>Sem dados</p>';
-      var histHtml = dados.histRows.length
-        ? '<table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Cliente</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Evento</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Detalhe</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Data</th></tr></thead><tbody>' +
-          dados.histRows.map(function(r) { return '<tr>' + r.map(function(c) { return '<td style="border:1px solid #e2e8f0;padding:8px">' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'
-        : '<p>Sem eventos</p>';
-      return '<style>@media print{#docPrintView .toolbar-doc{display:none!important}body>*:not(#docPrintView){display:none!important}#docPrintView{position:static!important;overflow:visible!important;background:#fff!important}}</style>' +
-        '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px;color:#0f172a;font-family:Arial,Helvetica,sans-serif">' +
-        '<h1 style="color:#4f46e5;margin:0 0 8px;font-size:26px">Relatório</h1>' +
-        '<div style="color:#64748b;font-size:13px;margin-bottom:20px">Período: <strong>' + dados.periodo + '</strong> · Gerado em ' + dados.gerado + '</div>' +
-        '<h2 style="margin-top:28px;font-size:16px;border-bottom:2px solid #6366f1;padding-bottom:6px">Indicadores</h2>' + kpiHtml +
-        '<h2 style="margin-top:28px;font-size:16px;border-bottom:2px solid #6366f1;padding-bottom:6px">Top clientes</h2>' + topHtml +
-        '<h2 style="margin-top:28px;font-size:16px;border-bottom:2px solid #6366f1;padding-bottom:6px">Histórico de eventos</h2>' + histHtml +
-        '<p style="margin-top:40px;font-size:12px;color:#94a3b8">Documento gerado pelo sistema Bónus Lodja</p></div>';
+
+      function tabela(headers, rows) {
+        if (!rows || !rows.length) {
+          return '<p class="muted">Sem dados neste período.</p>';
+        }
+        var h = '<table class="tbl"><thead><tr>' +
+          headers.map(function(x) { return '<th>' + esc(x) + '</th>'; }).join('') +
+          '</tr></thead><tbody>';
+        rows.forEach(function(r) {
+          h += '<tr>' + r.map(function(c) { return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>';
+        });
+        return h + '</tbody></table>';
+      }
+
+      var imgCompras = chartToDataUrl('chartCompras');
+      var imgValor = chartToDataUrl('chartValor');
+      var imgPecas = chartToDataUrl('chartPecas');
+      var imgSorteios = chartToDataUrl('chartSorteios');
+      var imgPremios = chartToDataUrl('chartPremios');
+      var imgEstado = chartToDataUrl('chartEstado');
+
+      function fig(src, titulo) {
+        if (!src) return '';
+        return '<div class="fig"><div class="fig-t">' + esc(titulo) + '</div>' +
+          '<img src="' + src + '" alt="' + esc(titulo) + '"/></div>';
+      }
+
+      var series = dados.series || {};
+      var labels = series.labels || [];
+      var serieRows = [];
+      for (var i = 0; i < labels.length; i++) {
+        serieRows.push([
+          labels[i],
+          series.compras ? series.compras[i] : 0,
+          series.valor ? series.valor[i] : 0,
+          series.pecas ? series.pecas[i] : 0,
+          series.sorteios ? series.sorteios[i] : 0
+        ]);
+      }
+      var premRows = [];
+      (series.premiosLabels || []).forEach(function(lab, idx) {
+        premRows.push([lab, (series.premiosData && series.premiosData[idx]) || 0]);
+      });
+
+      var css = '' +
+        '@page{margin:18mm}' +
+        'body{font-family:Calibri,Arial,Helvetica,sans-serif;color:#0f172a;margin:0;padding:28px;background:#fff;font-size:12px;line-height:1.45}' +
+        '.header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid #4f46e5;padding-bottom:14px;margin-bottom:18px}' +
+        '.brand h1{margin:0;font-size:22px;color:#312e81}' +
+        '.brand .sub{color:#64748b;font-size:12px;margin-top:4px}' +
+        '.meta{text-align:right;font-size:12px;color:#475569}' +
+        '.meta strong{color:#0f172a}' +
+        '.section{margin:22px 0 10px;font-size:14px;color:#4f46e5;border-left:4px solid #6366f1;padding-left:10px;font-weight:700}' +
+        '.kpis{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 18px}' +
+        '.kpi{min-width:120px;flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;background:linear-gradient(180deg,#f8fafc,#fff)}' +
+        '.kpi-l{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;font-weight:600}' +
+        '.kpi-v{font-size:18px;font-weight:800;color:#1e1b4b;margin-top:4px}' +
+        '.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0 18px}' +
+        '.fig{border:1px solid #e2e8f0;border-radius:12px;padding:10px;background:#fafafa;page-break-inside:avoid}' +
+        '.fig-t{font-size:11px;font-weight:700;color:#334155;margin-bottom:6px}' +
+        '.fig img{width:100%;height:auto;max-height:260px;object-fit:contain}' +
+        '.tbl{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:11px}' +
+        '.tbl th{background:#4f46e5;color:#fff;text-align:left;padding:8px 10px;font-weight:600}' +
+        '.tbl td{border:1px solid #e2e8f0;padding:7px 10px}' +
+        '.tbl tr:nth-child(even) td{background:#f8fafc}' +
+        '.muted{color:#94a3b8;font-size:12px}' +
+        '.footer{margin-top:28px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;text-align:center}' +
+        '@media print{body{padding:0}.grid{grid-template-columns:1fr 1fr}}';
+
+      var toolbar = paraImpressao
+        ? '<div class="toolbar no-print" style="position:sticky;top:0;z-index:5;display:flex;gap:10px;padding:12px;background:#fff;border-bottom:1px solid #e2e8f0;margin:-28px -28px 18px">' +
+          '<button type="button" onclick="window.close()" style="padding:10px 16px;border:none;border-radius:10px;background:#0f172a;color:#fff;font-weight:600;cursor:pointer">← Voltar ao Menu Principal</button>' +
+          '<button type="button" onclick="window.print()" style="padding:10px 16px;border:none;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:600;cursor:pointer">🖨 Imprimir</button></div>' +
+          '<style>@media print{.no-print{display:none!important}}</style>'
+        : '';
+
+      return '<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8">' +
+        '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+        '<title>Relatório — Bónus Lodja</title><style>' + css + '</style></head><body>' + toolbar +
+        '<div class="header"><div class="brand"><h1>Bónus Lodja — Relatório</h1>' +
+        '<div class="sub">Documento de análise de desempenho</div></div>' +
+        '<div class="meta"><div><strong>Período:</strong> ' + esc(dados.periodo) + '</div>' +
+        '<div><strong>Gerado em:</strong> ' + esc(dados.gerado) + '</div></div></div>' +
+
+        '<div class="section">1. Resumo executivo (KPIs)</div>' +
+        '<div class="kpis">' + (kpiCards || '<p class="muted">Sem indicadores</p>') + '</div>' +
+
+        '<div class="section">2. Análise gráfica</div>' +
+        '<div class="grid">' +
+          fig(imgCompras, 'Compras por período') +
+          fig(imgValor, 'Valor (MT) por período') +
+          fig(imgPecas, 'Peças por período') +
+          fig(imgSorteios, 'Sorteios por período') +
+          fig(imgPremios, 'Distribuição de prémios') +
+          fig(imgEstado, 'Estado das entregas') +
+        '</div>' +
+
+        '<div class="section">3. Série temporal (dados)</div>' +
+        tabela(['Período', 'Compras', 'Valor (MT)', 'Peças', 'Sorteios'], serieRows) +
+
+        '<div class="section">4. Prémios sorteados</div>' +
+        tabela(['Prémio', 'Quantidade'], premRows) +
+
+        '<div class="section">5. Top clientes</div>' +
+        tabela(['#', 'Cliente', 'Telefone', 'Peças', 'Compras', 'Valor'], dados.topRows || []) +
+
+        '<div class="section">6. Histórico de eventos</div>' +
+        tabela(['Cliente', 'Evento', 'Detalhe', 'Data'], dados.histRows || []) +
+
+        '<div class="footer">Documento gerado automaticamente pelo sistema Bónus Lodja · Confidencial</div>' +
+        '</body></html>';
+    }
+
+    function montarHtmlCorpoRelatorio(dados) {
+      // usado no overlay interno — versão completa
+      return montarDocumentoProfissional(dados, { paraImpressao: true }).replace(/^[\s\S]*<body[^>]*>/i, '').replace(/<\/body>[\s\S]*$/i, '');
     }
 
     function montarHtmlRelatorio(dados) {
-      var kpiHtml = dados.kpis.map(function(k) {
-        return '<div style="display:inline-block;min-width:120px;margin:6px 10px 6px 0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px"><div style="font-size:11px;color:#64748b">' + k.label + '</div><div style="font-size:18px;font-weight:700">' + k.value + '</div></div>';
-      }).join('');
-      var topHtml = dados.topRows.length
-        ? '<table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">#</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Cliente</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Telefone</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Peças</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Compras</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Valor</th></tr></thead><tbody>' +
-          dados.topRows.map(function(r) { return '<tr>' + r.map(function(c) { return '<td style="border:1px solid #e2e8f0;padding:8px">' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'
-        : '<p>Sem dados</p>';
-      var histHtml = dados.histRows.length
-        ? '<table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Cliente</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Evento</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Detalhe</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Data</th></tr></thead><tbody>' +
-          dados.histRows.map(function(r) { return '<tr>' + r.map(function(c) { return '<td style="border:1px solid #e2e8f0;padding:8px">' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'
-        : '<p>Sem eventos</p>';
-      return '<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório</title>' +
-        '<style>' +
-        '*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;padding:24px;max-width:900px;margin:0 auto;background:#f8fafc}' +
-        '.toolbar{position:sticky;top:0;z-index:10;display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:20px;box-shadow:0 4px 12px rgba(15,23,42,.06)}' +
-        '.btn-back{display:inline-flex;align-items:center;gap:6px;background:#0f172a;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;cursor:pointer}' +
-        '.btn-back:hover{background:#1e293b}' +
-        '.btn-print{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;cursor:pointer}' +
-        '.sheet{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px;box-shadow:0 8px 24px rgba(15,23,42,.05)}' +
-        'h1{color:#4f46e5;margin:0 0 8px;font-size:26px}h2{margin-top:28px;font-size:16px;border-bottom:2px solid #6366f1;padding-bottom:6px}' +
-        '.meta{color:#64748b;font-size:13px;margin-bottom:20px}' +
-        '@media print{body{background:#fff;padding:0}.toolbar{display:none!important}.sheet{box-shadow:none;border:none;padding:0}}' +
-        '</style></head><body>' +
-        '<div class="toolbar">' +
-        '<button type="button" class="btn-back" onclick="window.close()">← Voltar</button>' +
-        '<button type="button" class="btn-print" onclick="window.print()">🖨 Imprimir / PDF</button>' +
-        '</div>' +
-        '<div class="sheet">' +
-        '<h1>Relatório</h1>' +
-        '<div class="meta">Período: <strong>' + dados.periodo + '</strong> · Gerado em ' + dados.gerado + '</div>' +
-        '<h2>Indicadores</h2>' + kpiHtml +
-        '<h2>Top clientes</h2>' + topHtml +
-        '<h2>Histórico de eventos</h2>' + histHtml +
-        '<p style="margin-top:40px;font-size:12px;color:#94a3b8">Documento gerado pelo sistema Bónus Lodja</p>' +
-        '</div></body></html>';
-    }
-
-    function fecharDocView() {
-      var el = document.getElementById('docPrintView');
-      if (el) el.remove();
-      document.body.style.overflow = '';
-    }
-
-    function abrirDocView(htmlConteudo) {
-      fecharDocView();
-      var wrap = document.createElement('div');
-      wrap.id = 'docPrintView';
-      wrap.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:#f8fafc;overflow:auto;-webkit-overflow-scrolling:touch;');
-      wrap.innerHTML = '' +
-        '<div class="toolbar-doc" style="position:sticky;top:0;z-index:2;display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 14px;box-shadow:0 4px 12px rgba(15,23,42,.06)">' +
-        '<button type="button" id="btnDocVoltar" style="display:inline-flex;align-items:center;gap:6px;background:#0f172a;color:#fff;border:none;border-radius:10px;padding:12px 16px;font-weight:600;font-size:14px;cursor:pointer;min-height:44px">← Voltar ao Menu Principal</button>' +
-        '<button type="button" id="btnDocImprimir" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:10px;padding:12px 16px;font-weight:600;font-size:14px;cursor:pointer;min-height:44px">🖨 Imprimir</button>' +
-        '</div><div id="docPrintBody" style="padding:16px;max-width:900px;margin:0 auto"></div>';
-      document.body.appendChild(wrap);
-      document.body.style.overflow = 'hidden';
-      document.getElementById('docPrintBody').innerHTML = htmlConteudo;
-      document.getElementById('btnDocVoltar').onclick = function () { fecharDocView(); };
-      document.getElementById('btnDocImprimir').onclick = function () {
-        try { window.print(); }
-        catch (e) { App.toast('Use a partilha do telemóvel ou a opção Imprimir do sistema.', 'info', 4000); }
-      };
+      return montarDocumentoProfissional(dados, { paraImpressao: false });
     }
 
     function exportarPDF() {
       try {
         var dados = coletarDadosRelatorio();
-        var corpo = montarHtmlCorpoRelatorio(dados);
-        abrirDocView(corpo);
-        App.toast('Use Imprimir e escolha "Guardar como PDF" se quiser ficheiro', 'info', 4000);
+        var html = montarDocumentoProfissional(dados, { paraImpressao: true });
+        var w = window.open('', '_blank');
+        if (!w) {
+          // fallback overlay
+          if (typeof abrirDocView === 'function') {
+            abrirDocView(montarHtmlCorpoRelatorio(dados));
+          } else {
+            App.toast('Permita pop-ups para exportar PDF', 'error');
+          }
+          return;
+        }
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+        setTimeout(function() { try { w.focus(); w.print(); } catch (e) {} }, 600);
+        App.toast('Na impressão escolha "Guardar como PDF"', 'info', 4500);
       } catch (e) {
         console.error(e);
         App.toast('Erro PDF: ' + (e.message || e), 'error');
@@ -448,20 +517,70 @@
     function exportarWord() {
       try {
         var dados = coletarDadosRelatorio();
-        var html = montarHtmlRelatorio(dados);
+        var html = montarDocumentoProfissional(dados, { paraImpressao: false });
         var blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
-        var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
-        a.href = url;
+        a.href = URL.createObjectURL(blob);
         a.download = 'Relatorio-Bonus-Lodja-' + new Date().toISOString().slice(0, 10) + '.doc';
         document.body.appendChild(a);
         a.click();
-        setTimeout(function() { a.remove(); URL.revokeObjectURL(url); }, 400);
-        App.toast('Word descarregado', 'success');
+        a.remove();
+        App.toast('Word gerado com tabelas e gráficos', 'success');
       } catch (e) {
         console.error(e);
         App.toast('Erro Word: ' + (e.message || e), 'error');
       }
+    }
+
+    function estiloCabecalhoExcel() {
+      return {
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
+        fill: { fgColor: { rgb: '4F46E5' } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: '312E81' } },
+          bottom: { style: 'thin', color: { rgb: '312E81' } },
+          left: { style: 'thin', color: { rgb: '312E81' } },
+          right: { style: 'thin', color: { rgb: '312E81' } }
+        }
+      };
+    }
+
+    function estiloTituloExcel() {
+      return {
+        font: { bold: true, color: { rgb: '312E81' }, sz: 16 },
+        alignment: { vertical: 'center' }
+      };
+    }
+
+    function estiloKPILabel() {
+      return { font: { bold: true, color: { rgb: '64748B' }, sz: 10 }, fill: { fgColor: { rgb: 'F1F5F9' } } };
+    }
+
+    function estiloKPIValor() {
+      return { font: { bold: true, color: { rgb: '1E1B4B' }, sz: 14 }, fill: { fgColor: { rgb: 'EEF2FF' } } };
+    }
+
+    function aplicarEstiloLinha(ws, r, c0, c1, style) {
+      for (var c = c0; c <= c1; c++) {
+        var ref = XLSX.utils.encode_cell({ r: r, c: c });
+        if (!ws[ref]) ws[ref] = { t: 's', v: '' };
+        ws[ref].s = style;
+      }
+    }
+
+    function sheetFromAoA(aoa, opts) {
+      opts = opts || {};
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      if (opts.cols) ws['!cols'] = opts.cols;
+      if (opts.headerRow != null) {
+        aplicarEstiloLinha(ws, opts.headerRow, 0, (aoa[opts.headerRow] || []).length - 1, estiloCabecalhoExcel());
+      }
+      if (opts.titleRow != null) {
+        var ref = XLSX.utils.encode_cell({ r: opts.titleRow, c: 0 });
+        if (ws[ref]) ws[ref].s = estiloTituloExcel();
+      }
+      return ws;
     }
 
     function exportarExcel() {
@@ -472,42 +591,98 @@
         }
         var dados = coletarDadosRelatorio();
         var wb = XLSX.utils.book_new();
+        var series = dados.series || {};
+        var labels = series.labels || [];
 
-        var resumo = [['Bónus Lodja — Relatório'], ['Período', dados.periodo], ['Gerado em', dados.gerado], [], ['Indicador', 'Valor']];
-        dados.kpis.forEach(function(k) { resumo.push([k.label, k.value]); });
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
+        // ===== Dashboard =====
+        var dash = [];
+        dash.push(['BÓNUS LODJA — DASHBOARD DE RELATÓRIO']);
+        dash.push(['Período', dados.periodo, '', 'Gerado em', dados.gerado]);
+        dash.push([]);
+        dash.push(['INDICADORES-CHAVE (KPIs)']);
+        dash.push(['Indicador', 'Valor']);
+        (dados.kpis || []).forEach(function(k) { dash.push([k.label, k.value]); });
+        dash.push([]);
+        dash.push(['RESUMO DA SÉRIE TEMPORAL']);
+        dash.push(['Métrica', 'Total / Nota']);
+        var sum = function(arr) {
+          return (arr || []).reduce(function(s, n) { return s + (parseFloat(n) || 0); }, 0);
+        };
+        dash.push(['Total compras (período filtrado)', sum(series.compras)]);
+        dash.push(['Valor total (MT)', sum(series.valor)]);
+        dash.push(['Total peças', sum(series.pecas)]);
+        dash.push(['Total sorteios', sum(series.sorteios)]);
+        dash.push([]);
+        dash.push(['Notas']);
+        dash.push(['1. As folhas seguintes contêm tabelas detalhadas e dados para gráficos.']);
+        dash.push(['2. Folha "Dados Graficos": selecione as colunas → Inserir → Gráficos recomendados (Excel).']);
+        dash.push(['3. Folha "Premios" e "Top Clientes" para análise de ranking.']);
 
-        var labels = dados.series.labels || [];
-        var graf = [['Periodo', 'Compras', 'Valor (MT)', 'Pecas', 'Sorteios']];
+        var wsDash = sheetFromAoA(dash, {
+          titleRow: 0,
+          cols: [{ wch: 42 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 22 }]
+        });
+        // KPI header style
+        aplicarEstiloLinha(wsDash, 4, 0, 1, estiloCabecalhoExcel());
+        aplicarEstiloLinha(wsDash, 3, 0, 0, estiloTituloExcel());
+        aplicarEstiloLinha(wsDash, 7, 0, 1, estiloCabecalhoExcel());
+        XLSX.utils.book_append_sheet(wb, wsDash, 'Dashboard');
+
+        // ===== Dados Graficos =====
+        var graf = [['Periodo', 'Compras', 'Valor_MT', 'Pecas', 'Sorteios']];
         for (var i = 0; i < labels.length; i++) {
           graf.push([
             labels[i],
-            (dados.series.compras && dados.series.compras[i]) || 0,
-            (dados.series.valor && dados.series.valor[i]) || 0,
-            (dados.series.pecas && dados.series.pecas[i]) || 0,
-            (dados.series.sorteios && dados.series.sorteios[i]) || 0
+            Number(series.compras && series.compras[i]) || 0,
+            Number(series.valor && series.valor[i]) || 0,
+            Number(series.pecas && series.pecas[i]) || 0,
+            Number(series.sorteios && series.sorteios[i]) || 0
           ]);
         }
         if (graf.length === 1) graf.push(['Sem dados', 0, 0, 0, 0]);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(graf), 'Dados Graficos');
+        var wsGraf = sheetFromAoA(graf, {
+          headerRow: 0,
+          cols: [{ wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 }]
+        });
+        XLSX.utils.book_append_sheet(wb, wsGraf, 'Dados Graficos');
 
+        // ===== Premios =====
         var prem = [['Premio', 'Quantidade']];
-        var pl = dados.series.premiosLabels || [];
-        var pd = dados.series.premiosData || [];
-        for (var j = 0; j < pl.length; j++) prem.push([pl[j], pd[j] || 0]);
+        (series.premiosLabels || []).forEach(function(lab, idx) {
+          prem.push([lab, Number(series.premiosData && series.premiosData[idx]) || 0]);
+        });
         if (prem.length === 1) prem.push(['Sem dados', 0]);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(prem), 'Premios');
+        var wsPrem = sheetFromAoA(prem, { headerRow: 0, cols: [{ wch: 28 }, { wch: 12 }] });
+        XLSX.utils.book_append_sheet(wb, wsPrem, 'Premios');
 
+        // ===== Top =====
         var top = [['#', 'Cliente', 'Telefone', 'Pecas', 'Compras', 'Valor']];
-        dados.topRows.forEach(function(r) { top.push(r); });
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(top), 'Top Clientes');
+        (dados.topRows || []).forEach(function(r) { top.push(r); });
+        if (top.length === 1) top.push(['—', 'Sem dados', '', '', '', '']);
+        var wsTop = sheetFromAoA(top, {
+          headerRow: 0,
+          cols: [{ wch: 6 }, { wch: 24 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 14 }]
+        });
+        XLSX.utils.book_append_sheet(wb, wsTop, 'Top Clientes');
 
+        // ===== Historico =====
         var hist = [['Cliente', 'Evento', 'Detalhe', 'Data']];
-        dados.histRows.forEach(function(r) { hist.push(r); });
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hist), 'Historico');
+        (dados.histRows || []).forEach(function(r) { hist.push(r); });
+        if (hist.length === 1) hist.push(['—', 'Sem eventos', '', '']);
+        var wsHist = sheetFromAoA(hist, {
+          headerRow: 0,
+          cols: [{ wch: 22 }, { wch: 16 }, { wch: 28 }, { wch: 18 }]
+        });
+        XLSX.utils.book_append_sheet(wb, wsHist, 'Historico');
+
+        // ===== KPIs detalhado =====
+        var kpiSheet = [['Indicador', 'Valor']];
+        (dados.kpis || []).forEach(function(k) { kpiSheet.push([k.label, k.value]); });
+        var wsKpi = sheetFromAoA(kpiSheet, { headerRow: 0, cols: [{ wch: 36 }, { wch: 18 }] });
+        XLSX.utils.book_append_sheet(wb, wsKpi, 'KPIs');
 
         XLSX.writeFile(wb, 'Relatorio-Bonus-Lodja-' + new Date().toISOString().slice(0, 10) + '.xlsx');
-        App.toast('Excel pronto! Folha "Dados Graficos": selecione dados → Inserir → Gráfico', 'success', 5500);
+        App.toast('Excel profissional gerado (Dashboard + tabelas para gráficos)', 'success', 4500);
       } catch (e) {
         console.error(e);
         App.toast('Erro Excel: ' + (e.message || e), 'error');
