@@ -83,7 +83,7 @@
           <h2>Gestão do Bónus Especial</h2>
         </div>
         <div class="topbar-actions">
-          <button class="btn btn-outline" onclick="carregarTudo()">Actualizar</button>
+          <button class="btn btn-outline" onclick="carregarTudo({ toast: true })">Actualizar</button>
         </div>
       </header>
       <div class="content">
@@ -125,8 +125,17 @@
                   <option value="clientes">Apenas clientes seleccionados</option>
                 </select>
               </div>
-              <div id="boxClientesPick" style="display:none">
-                <label>Seleccionar clientes</label>
+              <div id="boxClientesResumo" style="display:none;margin-top:8px">
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;border:1px solid var(--border,#334155);border-radius:12px;background:var(--bg-elevated,#0f172a)">
+                  <span id="resumoClientesTxt" class="text-muted" style="font-size:14px;flex:1;min-width:180px"></span>
+                  <button type="button" class="btn btn-outline btn-sm" onclick="abrirEdicaoClientes()">Editar selecção</button>
+                </div>
+              </div>
+              <div id="boxClientesPick" style="display:none;margin-top:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+                  <label style="margin:0">Seleccionar clientes</label>
+                  <button type="button" class="btn btn-outline btn-sm" onclick="fecharEdicaoClientes()">Minimizar</button>
+                </div>
                 <input type="search" id="buscaCliente" class="form-control" placeholder="Pesquisar nome ou telefone..." oninput="filtrarClientesPick()">
                 <div class="cliente-pick" id="listaClientesPick"></div>
                 <p class="text-muted" style="font-size:12px;margin-top:6px">Só os seleccionados poderão entrar no bónus com o contacto registado.</p>
@@ -186,7 +195,17 @@
         <!-- HISTORICO -->
         <div class="panel" id="panel-historico">
           <div class="card">
-            <div class="card-header"><h3>Últimas promoções / campanhas</h3></div>
+            <div class="card-header d-flex justify-between align-center flex-wrap gap-2">
+              <div>
+                <h3>Últimas promoções / campanhas</h3>
+                <p class="text-muted" style="font-size:13px;margin:0">Histórico com contagem de participantes por campanha.</p>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-outline btn-sm" type="button" onclick="exportarHist('excel')">Excel</button>
+                <button class="btn btn-outline btn-sm" type="button" onclick="exportarHist('pdf')">PDF</button>
+                <button class="btn btn-outline btn-sm" type="button" onclick="exportarHist('word')">Word</button>
+              </div>
+            </div>
             <div class="card-body" style="overflow-x:auto">
               <table>
                 <thead>
@@ -232,9 +251,49 @@
       });
     });
 
+    let editandoClientes = false;
+    let historicoRowsCache = [];
+
+    function actualizarResumoClientes() {
+      const n = selectedIds.size;
+      const el = document.getElementById('resumoClientesTxt');
+      if (!el) return;
+      if (n === 0) el.textContent = 'Nenhum cliente seleccionado ainda.';
+      else if (n === 1) el.textContent = '1 cliente seleccionado para esta campanha.';
+      else el.textContent = n + ' clientes seleccionados para esta campanha.';
+    }
+
     function toggleClientesPick() {
-      document.getElementById('boxClientesPick').style.display =
-        document.getElementById('beModo').value === 'clientes' ? 'block' : 'none';
+      const modo = document.getElementById('beModo').value;
+      const resumo = document.getElementById('boxClientesResumo');
+      const pick = document.getElementById('boxClientesPick');
+      if (modo !== 'clientes') {
+        resumo.style.display = 'none';
+        pick.style.display = 'none';
+        editandoClientes = false;
+        return;
+      }
+      // Após guardar (ou ao carregar): mostrar resumo; lista só se estiver a editar
+      if (editandoClientes) {
+        resumo.style.display = 'none';
+        pick.style.display = 'block';
+        filtrarClientesPick();
+      } else {
+        resumo.style.display = 'block';
+        pick.style.display = 'none';
+        actualizarResumoClientes();
+      }
+    }
+
+    function abrirEdicaoClientes() {
+      editandoClientes = true;
+      toggleClientesPick();
+    }
+
+    function fecharEdicaoClientes() {
+      editandoClientes = false;
+      actualizarResumoClientes();
+      toggleClientesPick();
     }
 
     function filtrarClientesPick() {
@@ -256,30 +315,45 @@
       if (on) selectedIds.add(id); else selectedIds.delete(id);
     }
 
-    async function carregarTudo() {
-      cfgCache = await Storage.getConfig();
-      const be = cfgCache.bonusEspecial || {};
-      document.getElementById('beActivo').value = be.activo ? 'true' : 'false';
-      document.getElementById('beNome').value = be.nome || '';
-      document.getElementById('beDesc').value = be.descricao || '';
-      document.getElementById('beCodigo').value = be.codigo || '';
-      document.getElementById('beModo').value = be.modoAcesso === 'clientes' ? 'clientes' : 'publico';
-      selectedIds = new Set(be.clientesIds || []);
-      toggleClientesPick();
+    async function carregarTudo(opts) {
+      opts = opts || {};
+      const btn = document.querySelector('.topbar-actions .btn');
+      const prev = btn ? btn.textContent : '';
+      try {
+        if (btn) { btn.disabled = true; btn.textContent = 'A actualizar...'; }
+        cfgCache = await Storage.getConfig();
+        const be = cfgCache.bonusEspecial || {};
+        document.getElementById('beActivo').value = be.activo ? 'true' : 'false';
+        document.getElementById('beNome').value = be.nome || '';
+        document.getElementById('beDesc').value = be.descricao || '';
+        document.getElementById('beCodigo').value = be.codigo || '';
+        document.getElementById('beModo').value = be.modoAcesso === 'clientes' ? 'clientes' : 'publico';
+        selectedIds = new Set(be.clientesIds || []);
+        // Não reabrir a lista longa ao actualizar
+        editandoClientes = false;
+        actualizarResumoClientes();
+        toggleClientesPick();
 
-      document.getElementById('beLink').value = linkPublico();
-      document.getElementById('beCampanhaInfo').textContent = be.campanhaId
-        ? ('ID campanha: ' + be.campanhaId + (be.criadoEm ? ' · criada ' + App.formatDateTime(be.criadoEm) : ''))
-        : 'Ainda sem campanha guardada';
+        document.getElementById('beLink').value = linkPublico();
+        document.getElementById('beCampanhaInfo').textContent = be.campanhaId
+          ? ('ID campanha: ' + be.campanhaId + (be.criadoEm ? ' · criada ' + App.formatDateTime(be.criadoEm) : ''))
+          : 'Ainda sem campanha guardada';
 
-      clientesCache = await Storage.getClientes();
-      filtrarClientesPick();
+        clientesCache = await Storage.getClientes();
+        if (editandoClientes) filtrarClientesPick();
 
-      const campanhaId = be.campanhaId || null;
-      participantesCache = await Storage.getParticipantesBonusEspecial(campanhaId);
-      renderParticipantes();
-      renderKpis(be);
-      await renderHistorico(be);
+        const campanhaId = be.campanhaId || null;
+        participantesCache = await Storage.getParticipantesBonusEspecial(campanhaId);
+        renderParticipantes();
+        renderKpis(be);
+        await renderHistorico(be);
+        if (opts.toast !== false) App.toast('Dados actualizados', 'success', 2000);
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro ao actualizar: ' + (e.message || e), 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = prev || 'Actualizar'; }
+      }
     }
 
     function renderKpis(be) {
@@ -334,18 +408,33 @@
 
       const tb = document.getElementById('tabelaHist');
       if (!rows.length) {
+        historicoRowsCache = [];
         tb.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Sem histórico ainda</td></tr>';
         return;
       }
 
       const counts = {};
+      const detalheParts = {};
       for (const r of rows) {
         if (!r.campanhaId) continue;
         if (counts[r.campanhaId] == null) {
           const lista = await Storage.getParticipantesBonusEspecial(r.campanhaId);
           counts[r.campanhaId] = lista.length;
+          detalheParts[r.campanhaId] = lista;
         }
       }
+
+      historicoRowsCache = rows.map(r => ({
+        CampanhaId: r.campanhaId || '',
+        Nome: r.nome || '',
+        Codigo: r.codigo || '',
+        Modo: r.modoAcesso === 'clientes' ? 'Clientes' : 'Público',
+        Estado: (r._actual && r.activo) ? 'Activa' : 'Encerrada',
+        Criada: r.criadoEm || '',
+        Encerrada: (r.encerradoEm && r.encerradoEm !== '— (actual)') ? r.encerradoEm : (r._actual && r.activo ? '' : (r.encerradoEm || '')),
+        Participantes: counts[r.campanhaId] != null ? counts[r.campanhaId] : 0,
+        _lista: detalheParts[r.campanhaId] || []
+      }));
 
       tb.innerHTML = rows.map(r => `<tr>
         <td style="font-size:12px">${App.escapeHtml(r.campanhaId || '—')}</td>
@@ -356,6 +445,79 @@
         <td>${r.encerradoEm && r.encerradoEm !== '— (actual)' ? App.formatDateTime(r.encerradoEm) : App.escapeHtml(String(r.encerradoEm || '—'))}</td>
         <td>${counts[r.campanhaId] != null ? counts[r.campanhaId] : '—'}</td>
       </tr>`).join('');
+    }
+
+    function exportarHist(tipo) {
+      if (!historicoRowsCache.length) { App.toast('Sem histórico para exportar', 'info'); return; }
+      // Folha resumo + folhas por campanha (participantes)
+      if (tipo === 'excel') {
+        if (typeof XLSX === 'undefined') { App.toast('Biblioteca Excel não carregou', 'error'); return; }
+        const resumo = historicoRowsCache.map(r => ({
+          CampanhaId: r.CampanhaId,
+          Nome: r.Nome,
+          Codigo: r.Codigo,
+          Modo: r.Modo,
+          Estado: r.Estado,
+          Criada: r.Criada,
+          Encerrada: r.Encerrada,
+          Participantes: r.Participantes
+        }));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumo), 'Historico');
+        historicoRowsCache.forEach((r, idx) => {
+          const parts = (r._lista || []).map(p => ({
+            Data: p.dataParticipacao || '',
+            Nome: p.nome || '',
+            Contacto: p.telefone || '',
+            Estado: (p.estado === 'concluido' || p.premioNome) ? 'Jogou' : 'Registado',
+            Premio: p.premioNome || '',
+            Codigo: p.codigo || ''
+          }));
+          const sheetName = ('C' + (idx + 1) + '_' + (r.Nome || 'camp')).replace(/[^\w]/g, '').slice(0, 28) || ('Camp' + (idx + 1));
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(parts.length ? parts : [{ Info: 'Sem participantes' }]), sheetName);
+        });
+        XLSX.writeFile(wb, 'historico-bonus-especial.xlsx');
+        return;
+      }
+      let blocos = '';
+      historicoRowsCache.forEach(r => {
+        blocos += '<h2>' + String(r.Nome || 'Campanha').replace(/</g,'&lt;') + ' <small>(' + String(r.CampanhaId || '').replace(/</g,'&lt;') + ')</small></h2>';
+        blocos += '<p>Código: ' + String(r.Codigo || '—').replace(/</g,'&lt;') +
+          ' · Modo: ' + r.Modo + ' · Estado: ' + r.Estado +
+          ' · Participantes: ' + r.Participantes + '</p>';
+        const lista = r._lista || [];
+        if (!lista.length) {
+          blocos += '<p><em>Sem participantes</em></p>';
+        } else {
+          blocos += '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;margin-bottom:18px"><thead><tr>' +
+            '<th>Data</th><th>Nome</th><th>Contacto</th><th>Estado</th><th>Prémio</th><th>Código</th></tr></thead><tbody>';
+          lista.forEach(p => {
+            blocos += '<tr><td>' + String(p.dataParticipacao || '').replace(/</g,'&lt;') +
+              '</td><td>' + String(p.nome || '').replace(/</g,'&lt;') +
+              '</td><td>' + String(p.telefone || '').replace(/</g,'&lt;') +
+              '</td><td>' + ((p.estado === 'concluido' || p.premioNome) ? 'Jogou' : 'Registado') +
+              '</td><td>' + String(p.premioNome || '').replace(/</g,'&lt;') +
+              '</td><td>' + String(p.codigo || '').replace(/</g,'&lt;') + '</td></tr>';
+          });
+          blocos += '</tbody></table>';
+        }
+      });
+      const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Histórico Bónus Especial</title></head>' +
+        '<body style="font-family:Arial;padding:24px"><h1>Histórico — Bónus Especial</h1>' + blocos + '</body></html>';
+      if (tipo === 'pdf') {
+        const w = window.open('', '_blank');
+        if (!w) { App.toast('Permita pop-ups', 'error'); return; }
+        w.document.write(html);
+        w.document.close();
+        setTimeout(() => { w.focus(); w.print(); }, 400);
+        App.toast('Escolha "Guardar como PDF" na impressão', 'info', 4000);
+      } else {
+        const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'historico-bonus-especial.doc';
+        a.click();
+      }
     }
 
     async function guardarCampanha(opts) {
@@ -383,8 +545,9 @@
         criadoEm: (antigo.campanhaId === campanhaId && antigo.criadoEm) ? antigo.criadoEm : new Date().toISOString()
       };
       await Storage.saveConfig(cfg);
+      editandoClientes = false;
       App.toast('Campanha guardada', 'success');
-      await carregarTudo();
+      await carregarTudo({ toast: false });
     }
 
     async function novaCampanha() {
@@ -478,7 +641,7 @@
       }
     }
 
-    carregarTudo();
+    carregarTudo({ toast: false });
   </script>
 </body>
 </html>
