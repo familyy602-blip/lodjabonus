@@ -23,62 +23,29 @@
     body {
       min-height: 100vh;
       background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 45%, #0f172a 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      font-family: Inter, system-ui, sans-serif;
-      color: #e2e8f0;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; font-family: Inter, system-ui, sans-serif; color: #e2e8f0;
     }
     .card-esp {
-      max-width: 440px;
-      width: 100%;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 20px;
-      padding: 32px 28px;
-      text-align: center;
+      max-width: 440px; width: 100%; background: #1e293b; border: 1px solid #334155;
+      border-radius: 20px; padding: 32px 28px; text-align: center;
       box-shadow: 0 24px 48px rgba(0,0,0,.35);
     }
     .badge {
-      display: inline-block;
-      background: linear-gradient(135deg, #f59e0b, #ef4444);
-      color: #fff;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      padding: 6px 14px;
-      border-radius: 20px;
-      margin-bottom: 16px;
+      display: inline-block; background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; padding: 6px 14px; border-radius: 20px; margin-bottom: 16px;
     }
     h1 { font-size: 1.5rem; margin-bottom: 12px; }
     .desc { color: #94a3b8; font-size: 15px; line-height: 1.55; margin-bottom: 20px; white-space: pre-wrap; }
-    .codigo {
-      font-size: 28px;
-      font-weight: 800;
-      letter-spacing: 3px;
-      color: #fbbf24;
-      background: #0f172a;
-      border: 2px dashed #f59e0b;
-      border-radius: 12px;
-      padding: 16px;
-      margin: 16px 0 8px;
-    }
-    .hint { font-size: 13px; color: #64748b; margin-top: 8px; }
     .off { color: #94a3b8; font-size: 15px; }
-    a.voltar { display: inline-block; margin-top: 24px; color: #a5b4fc; font-size: 14px; }
     .form-acesso { text-align: left; margin-top: 8px; }
-    .form-acesso label {
-      display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; font-weight: 500;
-    }
+    .form-acesso label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; font-weight: 500; }
     .form-acesso input {
       width: 100%; padding: 12px 14px; background: #0f172a; border: 1px solid #334155;
       border-radius: 10px; color: #f1f5f9; font-size: 16px; font-family: inherit; margin-bottom: 14px;
     }
-    .form-acesso input:focus {
-      outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.25);
-    }
+    .form-acesso input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.25); }
     .btn-confirmar {
       width: 100%; padding: 14px; background: linear-gradient(135deg, #f59e0b, #ef4444);
       color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600;
@@ -86,16 +53,15 @@
     }
     .btn-confirmar:disabled { opacity: 0.6; cursor: not-allowed; }
     .erro-form {
-      display: none; background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.35);
-      border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; text-align: left;
+      display: none; background: rgba(239,68,68,0.15); color: #fca5a5;
+      border: 1px solid rgba(239,68,68,0.35); border-radius: 10px; padding: 10px 12px;
+      font-size: 13px; margin-bottom: 12px; text-align: left;
     }
     .erro-form.show { display: block; }
   </style>
 </head>
 <body>
-  <div class="card-esp" id="box">
-    <p class="off">A carregar...</p>
-  </div>
+  <div class="card-esp" id="box"><p class="off">A carregar...</p></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
   <script src="storage.js"></script>
@@ -105,39 +71,42 @@
     function escapeHtml(s) {
       return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
+    function normalizarTelefone(t) { return String(t || '').replace(/\D/g, ''); }
 
-    function normalizarTelefone(t) {
-      return String(t || '').replace(/\D/g, '');
+    function irParaRoletaEspecial(cliente, campanhaId) {
+      try {
+        sessionStorage.setItem('bonus_especial_sessao', JSON.stringify({
+          clienteId: cliente.id,
+          nome: cliente.nome,
+          telefone: cliente.telefone,
+          campanhaId: campanhaId,
+          ts: Date.now()
+        }));
+      } catch (e) {}
+      window.location.href = 'roleta.html?modo=especial';
     }
 
-    function mostrarBonus(be, cliente) {
-      const box = document.getElementById('box');
-      const saudacao = cliente && cliente.nome
-        ? `<p class="hint" style="margin-bottom:12px;color:#a5b4fc">Olá, ${escapeHtml(cliente.nome)}!</p>`
-        : '';
-      box.innerHTML = `
-        <div class="badge">🔥 Bónus especial</div>
-        ${saudacao}
-        <h1>${escapeHtml(be.nome)}</h1>
-        <p class="desc">${escapeHtml(be.descricao || 'Apresente esta oferta no balcão ao fazer a sua compra.')}</p>
-        ${be.codigo ? `<div class="codigo">${escapeHtml(be.codigo)}</div><p class="hint">Mostre este código na loja</p>` : ''}
-        <a class="voltar" href="roleta.html">Ir para a roleta</a>
+    function mostrarBloqueado() {
+      document.getElementById('box').innerHTML = `
+        <div class="badge" style="background:#475569">Já participou</div>
+        <h1>Bónus Especial</h1>
+        <p class="off">Este dispositivo já participou no Bónus Especial.<br><br>Aguarde pelo anúncio de um novo Bónus.</p>
       `;
     }
 
-    function mostrarFormulario(be) {
+    function mostrarFormulario(be, campanhaId) {
       const box = document.getElementById('box');
       box.innerHTML = `
         <div class="badge">🔥 Bónus especial</div>
-        <h1>Aceder à oferta</h1>
-        <p class="desc" style="margin-bottom:18px">Preencha os seus dados para ver o bónus especial. Se já for cliente, usamos o registo existente.</p>
+        <h1>${escapeHtml(be.nome || 'Bónus Especial')}</h1>
+        <p class="desc">${escapeHtml(be.descricao || 'Preencha os dados para girar a roleta do bónus especial.')}</p>
         <div class="erro-form" id="erroAcesso"></div>
         <form class="form-acesso" id="formAcesso">
           <label for="nomeAcesso">Nome completo *</label>
-          <input type="text" id="nomeAcesso" name="nome" required autocomplete="name" placeholder="O seu nome">
+          <input type="text" id="nomeAcesso" required autocomplete="name" placeholder="O seu nome">
           <label for="telAcesso">Contacto / WhatsApp *</label>
-          <input type="tel" id="telAcesso" name="telefone" required autocomplete="tel" placeholder="8XXXXXXXX" inputmode="numeric">
-          <button type="submit" class="btn-confirmar" id="btnAcesso">Confirmar e ver bónus</button>
+          <input type="tel" id="telAcesso" required autocomplete="tel" placeholder="8XXXXXXXX" inputmode="numeric">
+          <button type="submit" class="btn-confirmar" id="btnAcesso">Continuar para a Roleta</button>
         </form>
       `;
 
@@ -146,62 +115,35 @@
         const erroEl = document.getElementById('erroAcesso');
         const btn = document.getElementById('btnAcesso');
         erroEl.classList.remove('show');
-        erroEl.textContent = '';
-
         const nome = document.getElementById('nomeAcesso').value.trim();
         const telefone = normalizarTelefone(document.getElementById('telAcesso').value);
-
         if (!nome || nome.length < 2) {
-          erroEl.textContent = 'Introduza o seu nome.';
-          erroEl.classList.add('show');
-          return;
+          erroEl.textContent = 'Introduza o seu nome.'; erroEl.classList.add('show'); return;
         }
         if (!telefone || telefone.length < 8) {
-          erroEl.textContent = 'Introduza um contacto/WhatsApp válido (mín. 8 dígitos).';
-          erroEl.classList.add('show');
-          return;
+          erroEl.textContent = 'Introduza um contacto válido (mín. 8 dígitos).'; erroEl.classList.add('show'); return;
         }
-
         btn.disabled = true;
         btn.textContent = 'A registar...';
-
         try {
           const clientes = await Storage.getClientes();
           let cliente = clientes.find(c => normalizarTelefone(c.telefone) === telefone);
-
           if (cliente) {
-            // Já existe — não duplicar; actualizar nome se estiver vazio
             if ((!cliente.nome || cliente.nome.length < 2) && nome) {
-              try { await Storage.updateCliente(cliente.id, { nome }); } catch (e) {}
-              cliente.nome = nome;
+              try { await Storage.updateCliente(cliente.id, { nome }); cliente.nome = nome; } catch (e) {}
             }
           } else {
             cliente = await Storage.addCliente({
-              nome,
-              telefone,
-              totalPecas: 0,
-              totalCompras: 0,
-              noGrupoWhatsapp: false,
-              estado: 'activo'
+              nome, telefone, totalPecas: 0, totalCompras: 0, noGrupoWhatsapp: false, estado: 'activo'
             });
           }
-
-          try {
-            sessionStorage.setItem('bonus_especial_cliente', JSON.stringify({
-              id: cliente.id,
-              nome: cliente.nome,
-              telefone: cliente.telefone,
-              ts: Date.now()
-            }));
-          } catch (e) {}
-
-          mostrarBonus(be, cliente);
+          irParaRoletaEspecial(cliente, campanhaId);
         } catch (err) {
           console.error(err);
-          erroEl.textContent = 'Erro de ligação. Verifique a internet e tente de novo.';
+          erroEl.textContent = 'Erro de ligação. Tente novamente.';
           erroEl.classList.add('show');
           btn.disabled = false;
-          btn.textContent = 'Confirmar e ver bónus';
+          btn.textContent = 'Continuar para a Roleta';
         }
       });
     }
@@ -216,27 +158,37 @@
             <div class="badge" style="background:#475569">Indisponível</div>
             <h1>Bónus especial</h1>
             <p class="off">Neste momento não há bónus especial activo.<br>Volte a verificar em breve ou pergunte na loja.</p>
-            <a class="voltar" href="login.html">Área admin</a>
           `;
           return;
         }
+        let campanhaId = be.campanhaId;
+        if (!campanhaId) {
+          // gerar e gravar se faltar
+          campanhaId = 'camp_' + Date.now().toString(36);
+          be.campanhaId = campanhaId;
+          cfg.bonusEspecial = be;
+          try { await Storage.saveConfig(cfg); } catch (e) {}
+        }
 
-        // Se já preencheu nesta sessão, ir directo ao bónus
+        const ja = await Storage.jaParticipouBonusEspecial(campanhaId);
+        if (ja) { mostrarBloqueado(); return; }
+
+        // Sessão já registada nesta campanha → roleta directa
         try {
-          const raw = sessionStorage.getItem('bonus_especial_cliente');
+          const raw = sessionStorage.getItem('bonus_especial_sessao');
           if (raw) {
-            const saved = JSON.parse(raw);
-            if (saved && saved.telefone && saved.ts && (Date.now() - saved.ts) < 24 * 60 * 60 * 1000) {
-              mostrarBonus(be, saved);
+            const s = JSON.parse(raw);
+            if (s && s.clienteId && s.campanhaId === campanhaId) {
+              window.location.href = 'roleta.html?modo=especial';
               return;
             }
           }
         } catch (e) {}
 
-        mostrarFormulario(be);
+        mostrarFormulario(be, campanhaId);
       } catch (e) {
         console.error(e);
-        box.innerHTML = `<p class="off">Não foi possível carregar a oferta. Verifique a ligação.</p>`;
+        box.innerHTML = `<p class="off">Não foi possível carregar. Verifique a ligação.</p>`;
       }
     })();
   </script>

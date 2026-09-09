@@ -110,7 +110,11 @@
               <input type="text" id="bonusEspecialCodigo" class="form-control" placeholder="Ex: LODJA15" style="max-width:240px">
             </div>
             <p class="text-muted" style="font-size:12px">Página pública: <code>bonus-especial.html</code> — partilhe o link só quando estiver activo.</p>
-            <button class="btn btn-primary" onclick="salvarConfig()">Guardar Bónus Especial</button>
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-primary" onclick="salvarConfig()">Guardar Bónus Especial</button>
+              <button class="btn btn-outline" type="button" onclick="novaCampanhaBonus()">Anunciar novo Bónus (reiniciar participações)</button>
+            </div>
+            <p class="text-muted" style="font-size:12px;margin-top:8px">“Anunciar novo Bónus” gera uma nova campanha: os dispositivos que já jogaram podem voltar a participar.</p>
           </div>
         </div>
 
@@ -200,11 +204,22 @@
       if (novaPass) cfg.adminPassword = novaPass;
       if (logoDataUrl === '') cfg.logoUrl = null;
       else if (logoDataUrl) cfg.logoUrl = logoDataUrl;
+      const activoNovo = document.getElementById('bonusEspecialActivo').value === 'true';
+      const beAntigo = cfg.bonusEspecial || {};
+      let campanhaId = beAntigo.campanhaId || null;
+      // Nova campanha quando activa e (não tinha id ou estava desactivado antes)
+      if (activoNovo && (!campanhaId || !beAntigo.activo)) {
+        campanhaId = 'camp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+      }
+      if (!activoNovo) {
+        // mantém campanhaId antigo para histórico; dispositivo continua bloqueado nessa campanha
+      }
       cfg.bonusEspecial = {
-        activo: document.getElementById('bonusEspecialActivo').value === 'true',
+        activo: activoNovo,
         nome: document.getElementById('bonusEspecialNome').value.trim(),
         descricao: document.getElementById('bonusEspecialDesc').value.trim(),
-        codigo: document.getElementById('bonusEspecialCodigo').value.trim()
+        codigo: document.getElementById('bonusEspecialCodigo').value.trim(),
+        campanhaId: campanhaId
       };
       await Storage.saveConfig(cfg);
       App.toast('Configurações guardadas!', 'success');
@@ -216,6 +231,21 @@
       if (!App.confirm('Importar a base de dados real dos clientes (Excel) e substituir os dados actuais?')) return;
       const result = await Storage.seedDemo();
       App.toast(`${result.msg} (${result.clientes} clientes, ${result.elegiveis} elegíveis)`, 'success', 5000);
+    }
+
+    async function novaCampanhaBonus() {
+      if (!App.confirm('Criar uma NOVA campanha de Bónus Especial? Quem já participou poderá jogar outra vez.')) return;
+      const cfg = await Storage.getConfig();
+      document.getElementById('bonusEspecialActivo').value = 'true';
+      const be = cfg.bonusEspecial || {};
+      be.activo = true;
+      be.campanhaId = 'camp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+      be.nome = document.getElementById('bonusEspecialNome').value.trim() || be.nome || 'Bónus Especial';
+      be.descricao = document.getElementById('bonusEspecialDesc').value.trim() || be.descricao || '';
+      be.codigo = document.getElementById('bonusEspecialCodigo').value.trim() || be.codigo || '';
+      cfg.bonusEspecial = be;
+      await Storage.saveConfig(cfg);
+      App.toast('Nova campanha activa! Dispositivos podem participar de novo.', 'success', 4500);
     }
 
     function resetAll() {

@@ -145,15 +145,146 @@
 
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
+    const modoEspecial = params.get('modo') === 'especial';
     const app = document.getElementById('app');
 
-    // ========== MODO 1: Link exclusivo com token ==========
-    if (token) {
+    // ========== MODO BÓNUS ESPECIAL (sem regra das 5 peças) ==========
+    if (modoEspecial) {
+      initRoletaBonusEspecial();
+    } else if (token) {
+      // ========== MODO 1: Link exclusivo com token ==========
       initRoletaPorToken(token);
     } else {
-      // ========== MODO 2: Acesso público (grupo WhatsApp) ==========
+      // ========== MODO 2: Acesso público (grupo WhatsApp / 5 peças) ==========
       mostrarFormularioAcesso();
     }
+
+    async function initRoletaBonusEspecial() {
+      try {
+        const cfg = await Storage.getConfig();
+        const be = cfg.bonusEspecial || {};
+        if (!be.activo || !be.campanhaId) {
+          app.innerHTML = `
+            <div class="roleta-header">
+              <div class="badge-loja">Bónus Especial</div>
+              <h1>Indisponível</h1>
+              <p class="subtitulo">Não há bónus especial activo de momento.</p>
+              <p style="margin-top:20px"><a href="bonus-especial.html" style="color:#a5b4fc">← Voltar</a></p>
+            </div>`;
+          return;
+        }
+
+        const campanhaId = be.campanhaId;
+        const ja = await Storage.jaParticipouBonusEspecial(campanhaId);
+        if (ja) {
+          app.innerHTML = `
+            <div class="roleta-header">
+              <div class="badge-loja">Bónus Especial</div>
+              <h1>Já participou</h1>
+              <p class="subtitulo">Este dispositivo já participou no Bónus Especial.<br>Aguarde pelo anúncio de um novo Bónus.</p>
+            </div>`;
+          return;
+        }
+
+        let sessao = null;
+        try { sessao = JSON.parse(sessionStorage.getItem('bonus_especial_sessao') || 'null'); } catch (e) {}
+        if (!sessao || !sessao.clienteId || sessao.campanhaId !== campanhaId) {
+          window.location.href = 'bonus-especial.html';
+          return;
+        }
+
+        const cliente = await Storage.getClienteById(sessao.clienteId);
+        if (!cliente) {
+          window.location.href = 'bonus-especial.html';
+          return;
+        }
+
+        renderRoletaBonusEspecial(cliente, campanhaId, be);
+      } catch (e) {
+        console.error(e);
+        app.innerHTML = `<div class="roleta-header"><h1>Erro</h1><p class="subtitulo">Não foi possível carregar a roleta.</p></div>`;
+      }
+    }
+
+    async function renderRoletaBonusEspecial(cliente, campanhaId, be) {
+      const premios = (await Storage.getPremios()).filter(p => p.activo);
+      if (!premios.length) {
+        app.innerHTML = `<div class="roleta-header"><h1>Sem prémios</h1><p class="subtitulo">Contacte a loja.</p></div>`;
+        return;
+      }
+
+      app.innerHTML = `
+        <div class="roleta-header">
+          <div class="badge-loja">🔥 Bónus Especial</div>
+          <h1>${(be && be.nome) ? be.nome : 'Roleta Especial'}</h1>
+          <p class="cliente-nome">${cliente.nome || ''}</p>
+          <p class="subtitulo">Uma participação por dispositivo nesta campanha</p>
+        </div>
+        <div class="wheel-wrapper">
+          <div class="wheel-pointer"></div>
+          <div class="wheel" id="wheel"></div>
+          <div class="wheel-center">★</div>
+        </div>
+        <button class="btn-girar" id="btnGirar">GIRAR A ROLETA</button>
+        <div id="resultadoArea"></div>
+      `;
+
+      drawWheel(premios);
+      document.getElementById('btnGirar').addEventListener('click', async () => {
+        const btn = document.getElementById('btnGirar');
+        btn.disabled = true;
+        btn.textContent = 'A girar...';
+
+        const resultado = await Storage.realizarSorteioBonusEspecial(cliente.id, campanhaId);
+        if (resultado.erro) {
+          alert(resultado.erro);
+          btn.disabled = false;
+          btn.textContent = 'GIRAR A ROLETA';
+          if (String(resultado.erro).indexOf('já participou') >= 0) {
+            setTimeout(() => location.reload(), 800);
+          }
+          return;
+        }
+
+        const { sorteio, premio } = resultado;
+        const total = premios.reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0);
+        let acumulado = 0;
+        let anguloAlvo = 0;
+        const idx = premios.findIndex(p => p.id === premio.id);
+        for (let i = 0; i < premios.length; i++) {
+          const slice = ((parseFloat(premios[i].probabilidade) || 0) / total) * 360;
+          if (i === idx) { anguloAlvo = acumulado + slice / 2; break; }
+          acumulado += slice;
+        }
+        const voltas = 5 + Math.random() * 2;
+        const rotacaoFinal = (voltas * 360) + (360 - anguloAlvo);
+        const wheel = document.getElementById('wheel');
+        wheel.classList.add('spinning');
+        wheel.style.transform = `rotate(${rotacaoFinal}deg)`;
+
+        let ticks = 0;
+        const tickInterval = setInterval(() => {
+          if (typeof playTick === 'function') playTick();
+          ticks++;
+          if (ticks > 55) clearInterval(tickInterval);
+        }, 90);
+
+        setTimeout(() => {
+          clearInterval(tickInterval);
+          if (typeof playWinSound === 'function') playWinSound();
+          document.getElementById('resultadoArea').innerHTML = `
+            <div class="resultado-box ganhou">
+              <p class="premio-nome">${(premio.nome || '').replace(/</g,'&lt;')}</p>
+              <p style="color:#94a3b8;font-size:14px">${(premio.descricao || '').replace(/</g,'&lt;')}</p>
+              <p style="margin-top:12px;font-weight:700;color:#fbbf24">Código: ${sorteio.codigo || ''}</p>
+              <p style="margin-top:8px;font-size:13px;color:#94a3b8">Apresente este código na loja para receber o prémio.</p>
+            </div>`;
+          if (typeof lancarConfetti === 'function') lancarConfetti();
+          btn.textContent = 'Participação concluída';
+        }, 5200);
+      });
+    }
+
 
     // -------------------------------------------------------
     // FORMULÁRIO DE ACESSO (link geral para o grupo)

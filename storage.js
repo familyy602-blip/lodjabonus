@@ -333,6 +333,148 @@ const Storage = {
     return true;
   },
 
+
+  // ----- BONUS ESPECIAL -----
+  getDeviceId() {
+    try {
+      let id = localStorage.getItem('lodja_device_id');
+      if (!id) {
+        id = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem('lodja_device_id', id);
+      }
+      return id;
+    } catch (e) {
+      return 'dev_fallback_' + Date.now();
+    }
+  },
+
+  async getBonusCampanhaId() {
+    const cfg = await this.getConfig();
+    const be = cfg.bonusEspecial || {};
+    return be.campanhaId || null;
+  },
+
+  async jaParticipouBonusEspecial(campanhaId, deviceId) {
+    if (!campanhaId) return false;
+    const dev = deviceId || this.getDeviceId();
+    // local rápido
+    try {
+      if (localStorage.getItem('bonus_esp_done_' + campanhaId) === '1') return true;
+    } catch (e) {}
+    const { data, error } = await this._db()
+      .from('bonus_especial_participacoes')
+      .select('id')
+      .eq('campanha_id', campanhaId)
+      .eq('device_id', dev)
+      .limit(1);
+    if (error) {
+      console.error('jaParticipouBonusEspecial', error);
+      // se tabela ainda não existe, usar só local
+      try { return localStorage.getItem('bonus_esp_done_' + campanhaId) === '1'; } catch (e) { return false; }
+    }
+    return !!(data && data.length);
+  },
+
+  async gerarTokenBonusEspecial(clienteId) {
+    const cliente = await this.getClienteById(clienteId);
+    if (!cliente) return null;
+    // Token próprio para o bónus especial (não exige elegível / 5 peças)
+    const token = 'be_' + this.generateToken();
+    await this.updateCliente(clienteId, {
+      token,
+      tokenUsado: false,
+      dataTokenGerado: new Date().toISOString()
+    });
+    return token;
+  },
+
+  async realizarSorteioBonusEspecial(clienteId, campanhaId) {
+    const deviceId = this.getDeviceId();
+    if (!campanhaId) return { erro: 'Não há campanha de bónus especial activa' };
+
+    const ja = await this.jaParticipouBonusEspecial(campanhaId, deviceId);
+    if (ja) {
+      return { erro: 'Este dispositivo já participou no Bónus Especial. Aguarde pelo anúncio de um novo Bónus.' };
+    }
+
+    const cliente = await this.getClienteById(clienteId);
+    if (!cliente) return { erro: 'Cliente não encontrado' };
+
+    const premio = await this.sortearPremio();
+    if (!premio) return { erro: 'Nenhum prémio configurado' };
+
+    const codigo = this.generatePrizeCode(premio.nome);
+    const agora = new Date().toISOString();
+    const partId = this.generateId('bep_');
+
+    const partRow = {
+      id: partId,
+      campanha_id: campanhaId,
+      cliente_id: cliente.id,
+      cliente_nome: cliente.nome,
+      cliente_telefone: cliente.telefone || '',
+      device_id: deviceId,
+      premio_id: premio.id,
+      premio_nome: premio.nome,
+      premio_descricao: premio.descricao || '',
+      codigo,
+      data_participacao: agora,
+      estado: 'concluido'
+    };
+
+    const { error: errPart } = await this._db().from('bonus_especial_participacoes').insert(partRow);
+    if (errPart) {
+      console.error(errPart);
+      // conflito unique = já participou
+      if (String(errPart.message || errPart.code || '').includes('duplicate') || errPart.code === '23505') {
+        try { localStorage.setItem('bonus_esp_done_' + campanhaId, '1'); } catch (e) {}
+        return { erro: 'Este dispositivo já participou no Bónus Especial. Aguarde pelo anúncio de um novo Bónus.' };
+      }
+      return { erro: 'Erro ao registar participação. Verifique se a tabela bonus_especial_participacoes existe no Supabase.' };
+    }
+
+    // Também regista em sorteios para o admin ver entregas
+    const sorteioRow = {
+      id: this.generateId('srt_'),
+      cliente_id: cliente.id,
+      cliente_nome: cliente.nome,
+      cliente_telefone: cliente.telefone || '',
+      token: 'bonus_esp_' + campanhaId + '_' + deviceId,
+      premio_id: premio.id,
+      premio_nome: premio.nome,
+      premio_descricao: premio.descricao || '',
+      codigo,
+      data_sorteio: agora,
+      estado: 'premio_pendente'
+    };
+    await this._db().from('sorteios').insert(sorteioRow);
+
+    await this.updateCliente(cliente.id, {
+      ultimoPremio: premio.nome,
+      ultimoCodigo: codigo,
+      dataSorteio: agora
+    });
+
+    try { localStorage.setItem('bonus_esp_done_' + campanhaId, '1'); } catch (e) {}
+
+    return {
+      sucesso: true,
+      sorteio: {
+        id: sorteioRow.id,
+        clienteId: cliente.id,
+        clienteNome: cliente.nome,
+        clienteTelefone: cliente.telefone,
+        premioId: premio.id,
+        premioNome: premio.nome,
+        premioDescricao: premio.descricao,
+        codigo,
+        dataSorteio: agora,
+        estado: 'premio_pendente'
+      },
+      premio
+    };
+  },
+
   // ----- CONFIG -----
   async getConfig() {
     const padrao = { nomeLoja: 'Bónus Lodja - Compre e ganhe', pecasNecessarias: 5, adminPassword: 'admin123' };
