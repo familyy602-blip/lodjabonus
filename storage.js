@@ -349,11 +349,69 @@ const Storage = {
     }
   },
 
+  getLinkBonusEspecial() {
+    try {
+      const base = (document.querySelector('base') && document.querySelector('base').href) || (location.origin + location.pathname.replace(/[^/]*$/, ''));
+      return base.replace(/\/?$/, '/') + 'bonus-especial.html';
+    } catch (e) {
+      return 'bonus-especial.html';
+    }
+  },
+
+  async arquivarBonusActualSeExistir(cfg) {
+    const be = cfg.bonusEspecial || {};
+    if (!be.campanhaId) return cfg;
+    const hist = Array.isArray(be.historico) ? be.historico.slice() : [];
+    // evita duplicar a mesma campanha
+    if (!hist.some(h => h.campanhaId === be.campanhaId)) {
+      hist.unshift({
+        campanhaId: be.campanhaId,
+        nome: be.nome || 'Bónus Especial',
+        descricao: be.descricao || '',
+        codigo: be.codigo || '',
+        tipoAcesso: be.tipoAcesso || 'publico',
+        clientesIds: Array.isArray(be.clientesIds) ? be.clientesIds : [],
+        criadoEm: be.criadoEm || null,
+        encerradoEm: new Date().toISOString(),
+        activo: !!be.activo
+      });
+    }
+    be.historico = hist.slice(0, 50);
+    cfg.bonusEspecial = be;
+    return cfg;
+  },
+
   async getBonusCampanhaId() {
     const cfg = await this.getConfig();
     const be = cfg.bonusEspecial || {};
     return be.campanhaId || null;
   },
+
+  async getBonusHistorico() {
+    const cfg = await this.getConfig();
+    return Array.isArray(cfg.bonusEspecialHistorico) ? cfg.bonusEspecialHistorico : [];
+  },
+
+  async arquivarBonusActual() {
+    const cfg = await this.getConfig();
+    const be = cfg.bonusEspecial || {};
+    if (!be.campanhaId && !be.nome) return cfg;
+    const hist = Array.isArray(cfg.bonusEspecialHistorico) ? cfg.bonusEspecialHistorico.slice() : [];
+    hist.unshift({
+      campanhaId: be.campanhaId,
+      nome: be.nome,
+      descricao: be.descricao,
+      codigo: be.codigo,
+      activo: false,
+      modoAcesso: be.modoAcesso || 'publico',
+      clientesIds: be.clientesIds || [],
+      criadoEm: be.criadoEm || null,
+      encerradoEm: new Date().toISOString()
+    });
+    cfg.bonusEspecialHistorico = hist.slice(0, 50);
+    return cfg;
+  },
+
 
   _mapBonusPart(r) {
     if (!r) return null;
@@ -425,6 +483,21 @@ const Storage = {
     const tel = String(telefone || '').replace(/\D/g, '');
     if (!campanhaId) throw new Error('Campanha inválida');
     if (!nome || !tel) throw new Error('Nome e contacto são obrigatórios');
+
+    const cfg = await this.getConfig();
+    const be = cfg.bonusEspecial || {};
+    if (!be.activo) return { erro: 'O Bónus Especial não está activo de momento.' };
+    const modo = be.modoAcesso || be.tipoAcesso || 'publico';
+    if (modo === 'clientes') {
+      const ids = Array.isArray(be.clientesIds) ? be.clientesIds : [];
+      if (!ids.length) return { erro: 'Este bónus é restrito e ainda não tem clientes seleccionados.' };
+      const clientes = await this.getClientes();
+      const match = clientes.find(c => ids.includes(c.id) && String(c.telefone || '').replace(/\D/g, '') === tel);
+      if (!match) {
+        return { erro: 'Este contacto não está na lista de clientes seleccionados para este Bónus Especial.' };
+      }
+      if (match.nome) nome = match.nome;
+    }
 
     // Já concluiu roleta?
     if (await this.jaParticipouBonusEspecial(campanhaId, deviceId, tel)) {

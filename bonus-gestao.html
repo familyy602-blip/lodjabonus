@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <script>
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover">
+  <title>Gestão Bónus Especial — Bónus Lodja</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+    .tab-btn {
+      padding:10px 16px; border-radius:10px; border:1px solid var(--border,#334155);
+      background: transparent; color: inherit; font-weight:600; cursor:pointer;
+    }
+    .tab-btn.active { background: linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; border-color:transparent; }
+    .panel { display:none; }
+    .panel.active { display:block; }
+    .link-box {
+      display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+      background: var(--bg-elevated, #0f172a); border:1px solid var(--border,#334155);
+      border-radius:12px; padding:12px; margin-top:12px;
+    }
+    .link-box input { flex:1; min-width:180px; }
+    .cliente-pick {
+      max-height:220px; overflow:auto; border:1px solid var(--border,#334155);
+      border-radius:10px; padding:8px; margin-top:8px;
+    }
+    .cliente-pick label {
+      display:flex; gap:8px; align-items:center; padding:6px 4px;
+      border-bottom:1px solid rgba(148,163,184,.15); font-size:14px; cursor:pointer;
+    }
+    .kpi-row { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+    .kpi-mini {
+      min-width:120px; flex:1; background: var(--bg-elevated,#0f172a);
+      border:1px solid var(--border,#334155); border-radius:12px; padding:14px;
+    }
+    .kpi-mini .l { font-size:12px; color:#94a3b8; }
+    .kpi-mini .v { font-size:22px; font-weight:700; margin-top:4px; }
+  </style>
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">B</div>
+        <div><h1>Bónus Lodja - Compre e ganhe</h1><span>Painel Admin</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="clientes.html" class="nav-item"><span class="icon">👥</span> Clientes</a>
+        <a href="compras.html" class="nav-item"><span class="icon">🛒</span> Compras</a>
+        <a href="elegiveis.html" class="nav-item"><span class="icon">⭐</span> Elegíveis</a>
+        <a href="sorteios.html" class="nav-item"><span class="icon">🎡</span> Sorteios</a>
+        <a href="premios.html" class="nav-item"><span class="icon">🎁</span> Prémios</a>
+        <a href="entregas.html" class="nav-item"><span class="icon">📦</span> Entregas</a>
+        <a href="relatorios.html" class="nav-item"><span class="icon">📈</span> Relatórios</a>
+        <a href="bonus-gestao.html" class="nav-item active"><span class="icon">🔥</span> Bónus Especial</a>
+        <a href="configuracoes.html" class="nav-item"><span class="icon">⚙️</span> Configurações</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" onclick="Auth.logout()"><span class="icon">🚪</span> Sair</button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay"></div>
+    <div class="main-content">
+      <header class="topbar">
+        <div class="d-flex align-center gap-2">
+          <button class="menu-toggle">☰</button>
+          <h2>Gestão do Bónus Especial</h2>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-outline" onclick="carregarTudo()">Actualizar</button>
+        </div>
+      </header>
+      <div class="content">
+        <div class="tabs">
+          <button type="button" class="tab-btn active" data-tab="campanha">Campanha actual</button>
+          <button type="button" class="tab-btn" data-tab="participantes">Participantes</button>
+          <button type="button" class="tab-btn" data-tab="historico">Histórico</button>
+        </div>
+
+        <!-- CAMPANHA -->
+        <div class="panel active" id="panel-campanha">
+          <div class="kpi-row" id="kpisBonus"></div>
+          <div class="card">
+            <div class="card-header"><h3>Criar / editar Bónus Especial</h3></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label>Estado</label>
+                <select id="beActivo" class="form-control" style="max-width:220px">
+                  <option value="false">Inactivo</option>
+                  <option value="true">Activo</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Nome da promoção *</label>
+                <input type="text" id="beNome" class="form-control" placeholder="Ex: 15% extra este fim de semana">
+              </div>
+              <div class="form-group">
+                <label>Descrição</label>
+                <textarea id="beDesc" class="form-control" rows="3" placeholder="Detalhes da oferta"></textarea>
+              </div>
+              <div class="form-group">
+                <label>Código promocional (opcional)</label>
+                <input type="text" id="beCodigo" class="form-control" style="max-width:240px" placeholder="Ex: LODJA15">
+              </div>
+              <div class="form-group">
+                <label>Quem pode participar?</label>
+                <select id="beModo" class="form-control" style="max-width:320px" onchange="toggleClientesPick()">
+                  <option value="publico">Todos (através do link público)</option>
+                  <option value="clientes">Apenas clientes seleccionados</option>
+                </select>
+              </div>
+              <div id="boxClientesPick" style="display:none">
+                <label>Seleccionar clientes</label>
+                <input type="search" id="buscaCliente" class="form-control" placeholder="Pesquisar nome ou telefone..." oninput="filtrarClientesPick()">
+                <div class="cliente-pick" id="listaClientesPick"></div>
+                <p class="text-muted" style="font-size:12px;margin-top:6px">Só os seleccionados poderão entrar no bónus com o contacto registado.</p>
+              </div>
+              <div class="d-flex gap-2 flex-wrap" style="margin-top:16px">
+                <button class="btn btn-primary" type="button" onclick="guardarCampanha()">Guardar campanha</button>
+                <button class="btn btn-outline" type="button" onclick="novaCampanha()">Anunciar novo Bónus</button>
+                <button class="btn btn-outline" type="button" onclick="desactivarCampanha()">Desactivar</button>
+              </div>
+              <p class="text-muted" style="font-size:12px;margin-top:10px">“Anunciar novo Bónus” arquiva a campanha actual e gera uma nova (dispositivos podem voltar a participar).</p>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px">
+            <div class="card-header"><h3>Link de participação</h3></div>
+            <div class="card-body">
+              <p class="text-muted" style="font-size:14px;margin-bottom:8px">Partilhe este link no WhatsApp ou redes. Antes de divulgar, use <strong>Testar</strong>.</p>
+              <div class="link-box">
+                <input type="text" id="beLink" class="form-control" readonly>
+                <button class="btn btn-primary" type="button" onclick="copiarLink()">📋 Copiar Link</button>
+                <button class="btn btn-outline" type="button" onclick="verLink()">🔗 Ver Link</button>
+                <button class="btn btn-outline" type="button" onclick="testarBonus()">▶ Testar Bónus</button>
+              </div>
+              <p id="beCampanhaInfo" class="text-muted" style="font-size:12px;margin-top:8px"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- PARTICIPANTES -->
+        <div class="panel" id="panel-participantes">
+          <div class="card">
+            <div class="card-header d-flex justify-between align-center flex-wrap gap-2">
+              <div>
+                <h3>Participantes da campanha actual</h3>
+                <p class="text-muted" style="font-size:13px;margin:0">Não entram em Clientes até “Tornar Cliente Registado”.</p>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-outline btn-sm" type="button" onclick="exportarPart('excel')">Excel</button>
+                <button class="btn btn-outline btn-sm" type="button" onclick="exportarPart('pdf')">PDF</button>
+                <button class="btn btn-outline btn-sm" type="button" onclick="exportarPart('word')">Word</button>
+              </div>
+            </div>
+            <div class="card-body" style="overflow-x:auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Data</th><th>Nome</th><th>Contacto</th><th>Estado</th>
+                    <th>Prémio</th><th>Código</th><th>Cliente?</th><th>Acções</th>
+                  </tr>
+                </thead>
+                <tbody id="tabelaPart"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- HISTORICO -->
+        <div class="panel" id="panel-historico">
+          <div class="card">
+            <div class="card-header"><h3>Últimas promoções / campanhas</h3></div>
+            <div class="card-body" style="overflow-x:auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Campanha</th><th>Nome</th><th>Código</th><th>Modo</th>
+                    <th>Criada</th><th>Encerrada</th><th>Participantes</th>
+                  </tr>
+                </thead>
+                <tbody id="tabelaHist"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="storage.js"></script>
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+  <script>
+    initSupabase();
+    if (!Auth.requireAuth()) throw new Error('auth');
+
+    let cfgCache = null;
+    let clientesCache = [];
+    let participantesCache = [];
+    let selectedIds = new Set();
+
+    function linkPublico() {
+      const base = location.href.replace(/[^/]*$/, '');
+      return base + 'bonus-especial.html';
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    function toggleClientesPick() {
+      document.getElementById('boxClientesPick').style.display =
+        document.getElementById('beModo').value === 'clientes' ? 'block' : 'none';
+    }
+
+    function filtrarClientesPick() {
+      const q = (document.getElementById('buscaCliente').value || '').toLowerCase().trim();
+      const box = document.getElementById('listaClientesPick');
+      const lista = !q ? clientesCache : clientesCache.filter(c =>
+        (c.nome || '').toLowerCase().includes(q) || (c.telefone || '').includes(q)
+      );
+      box.innerHTML = lista.slice(0, 80).map(c => `
+        <label>
+          <input type="checkbox" value="${c.id}" ${selectedIds.has(c.id) ? 'checked' : ''}
+            onchange="toggleSel('${c.id}', this.checked)">
+          <span>${App.escapeHtml(c.nome || '—')} · ${App.escapeHtml(c.telefone || '')}</span>
+        </label>
+      `).join('') || '<p class="text-muted">Sem clientes</p>';
+    }
+
+    function toggleSel(id, on) {
+      if (on) selectedIds.add(id); else selectedIds.delete(id);
+    }
+
+    async function carregarTudo() {
+      cfgCache = await Storage.getConfig();
+      const be = cfgCache.bonusEspecial || {};
+      document.getElementById('beActivo').value = be.activo ? 'true' : 'false';
+      document.getElementById('beNome').value = be.nome || '';
+      document.getElementById('beDesc').value = be.descricao || '';
+      document.getElementById('beCodigo').value = be.codigo || '';
+      document.getElementById('beModo').value = be.modoAcesso === 'clientes' ? 'clientes' : 'publico';
+      selectedIds = new Set(be.clientesIds || []);
+      toggleClientesPick();
+
+      document.getElementById('beLink').value = linkPublico();
+      document.getElementById('beCampanhaInfo').textContent = be.campanhaId
+        ? ('ID campanha: ' + be.campanhaId + (be.criadoEm ? ' · criada ' + App.formatDateTime(be.criadoEm) : ''))
+        : 'Ainda sem campanha guardada';
+
+      clientesCache = await Storage.getClientes();
+      filtrarClientesPick();
+
+      const campanhaId = be.campanhaId || null;
+      participantesCache = await Storage.getParticipantesBonusEspecial(campanhaId);
+      renderParticipantes();
+      renderKpis(be);
+      await renderHistorico(be);
+    }
+
+    function renderKpis(be) {
+      const total = participantesCache.length;
+      const jogaram = participantesCache.filter(p => p.estado === 'concluido' || p.premioNome).length;
+      const el = document.getElementById('kpisBonus');
+      el.innerHTML = `
+        <div class="kpi-mini"><div class="l">Estado</div><div class="v" style="font-size:16px">${be.activo ? '🟢 Activo' : '⚪ Inactivo'}</div></div>
+        <div class="kpi-mini"><div class="l">Participantes</div><div class="v">${total}</div></div>
+        <div class="kpi-mini"><div class="l">Já jogaram</div><div class="v">${jogaram}</div></div>
+        <div class="kpi-mini"><div class="l">Modo</div><div class="v" style="font-size:15px">${be.modoAcesso === 'clientes' ? 'Clientes' : 'Público'}</div></div>
+      `;
+    }
+
+    function renderParticipantes() {
+      const tb = document.getElementById('tabelaPart');
+      if (!participantesCache.length) {
+        tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Sem participantes nesta campanha</td></tr>';
+        return;
+      }
+      tb.innerHTML = participantesCache.map(p => {
+        const jogou = p.estado === 'concluido' || p.premioNome;
+        const isCliente = !!p.clienteId;
+        return `<tr>
+          <td>${App.formatDateTime(p.dataParticipacao)}</td>
+          <td>${App.escapeHtml(p.nome)}</td>
+          <td>${App.escapeHtml(p.telefone)}</td>
+          <td>${jogou ? '<span class="text-success">Jogou</span>' : 'Registado'}</td>
+          <td>${App.escapeHtml(p.premioNome || '—')}</td>
+          <td>${App.escapeHtml(p.codigo || '—')}</td>
+          <td>${isCliente ? 'Sim' : 'Não'}</td>
+          <td>${isCliente ? '<span class="text-muted">No sistema</span>' :
+            `<button class="btn btn-primary btn-sm" onclick="tornarCliente('${p.id}')">Tornar Cliente Registado</button>`}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function renderHistorico(beActual) {
+      const hist = await Storage.getBonusHistorico();
+      const rows = [];
+      if (beActual && beActual.campanhaId) {
+        rows.push({
+          ...beActual,
+          encerradoEm: beActual.activo ? '— (actual)' : (beActual.encerradoEm || '—'),
+          _actual: true
+        });
+      }
+      hist.forEach(h => {
+        if (beActual && h.campanhaId === beActual.campanhaId) return;
+        rows.push(h);
+      });
+
+      const tb = document.getElementById('tabelaHist');
+      if (!rows.length) {
+        tb.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Sem histórico ainda</td></tr>';
+        return;
+      }
+
+      const counts = {};
+      for (const r of rows) {
+        if (!r.campanhaId) continue;
+        if (counts[r.campanhaId] == null) {
+          const lista = await Storage.getParticipantesBonusEspecial(r.campanhaId);
+          counts[r.campanhaId] = lista.length;
+        }
+      }
+
+      tb.innerHTML = rows.map(r => `<tr>
+        <td style="font-size:12px">${App.escapeHtml(r.campanhaId || '—')}</td>
+        <td>${App.escapeHtml(r.nome || '—')} ${r._actual && r.activo ? '<span class="text-success">· activa</span>' : ''}</td>
+        <td>${App.escapeHtml(r.codigo || '—')}</td>
+        <td>${r.modoAcesso === 'clientes' ? 'Clientes' : 'Público'}</td>
+        <td>${r.criadoEm ? App.formatDateTime(r.criadoEm) : '—'}</td>
+        <td>${r.encerradoEm && r.encerradoEm !== '— (actual)' ? App.formatDateTime(r.encerradoEm) : App.escapeHtml(String(r.encerradoEm || '—'))}</td>
+        <td>${counts[r.campanhaId] != null ? counts[r.campanhaId] : '—'}</td>
+      </tr>`).join('');
+    }
+
+    async function guardarCampanha(opts) {
+      opts = opts || {};
+      const cfg = await Storage.getConfig();
+      const antigo = cfg.bonusEspecial || {};
+      let campanhaId = antigo.campanhaId;
+      if (opts.forcarNova || !campanhaId) {
+        if (campanhaId && opts.forcarNova) {
+          const arch = await Storage.arquivarBonusActual();
+          Object.assign(cfg, arch);
+        }
+        campanhaId = 'camp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+      }
+      const nome = document.getElementById('beNome').value.trim();
+      if (!nome) { App.toast('Indique o nome da promoção', 'error'); return; }
+      cfg.bonusEspecial = {
+        activo: document.getElementById('beActivo').value === 'true',
+        nome,
+        descricao: document.getElementById('beDesc').value.trim(),
+        codigo: document.getElementById('beCodigo').value.trim(),
+        campanhaId,
+        modoAcesso: document.getElementById('beModo').value,
+        clientesIds: Array.from(selectedIds),
+        criadoEm: (antigo.campanhaId === campanhaId && antigo.criadoEm) ? antigo.criadoEm : new Date().toISOString()
+      };
+      await Storage.saveConfig(cfg);
+      App.toast('Campanha guardada', 'success');
+      await carregarTudo();
+    }
+
+    async function novaCampanha() {
+      if (!App.confirm('Arquivar a campanha actual e criar uma NOVA? Quem já participou poderá jogar de novo.')) return;
+      document.getElementById('beActivo').value = 'true';
+      await guardarCampanha({ forcarNova: true });
+    }
+
+    async function desactivarCampanha() {
+      document.getElementById('beActivo').value = 'false';
+      await guardarCampanha();
+    }
+
+    function copiarLink() {
+      const url = document.getElementById('beLink').value;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => App.toast('Link copiado!', 'success'))
+          .catch(() => fallbackCopy(url));
+      } else fallbackCopy(url);
+    }
+    function fallbackCopy(url) {
+      const i = document.getElementById('beLink');
+      i.select();
+      try { document.execCommand('copy'); App.toast('Link copiado!', 'success'); }
+      catch (e) { App.toast('Copie manualmente o link', 'info'); }
+    }
+    function verLink() { window.open(linkPublico(), '_blank'); }
+    function testarBonus() { window.open(linkPublico() + '?teste=1', '_blank'); }
+
+    async function tornarCliente(id) {
+      if (!App.confirm('Tem certeza de que deseja registar este cliente no sistema?')) return;
+      try {
+        const res = await Storage.tornarClienteRegistado(id);
+        App.toast(res.jaExistia ? 'Contacto já existia em Clientes' : 'Cliente registado!', res.jaExistia ? 'info' : 'success');
+        await carregarTudo();
+      } catch (e) {
+        App.toast('Erro: ' + (e.message || e), 'error');
+      }
+    }
+
+    function dadosExport() {
+      return participantesCache.map(p => ({
+        Data: p.dataParticipacao || '',
+        Nome: p.nome || '',
+        Contacto: p.telefone || '',
+        Estado: (p.estado === 'concluido' || p.premioNome) ? 'Jogou' : 'Registado',
+        Premio: p.premioNome || '',
+        Codigo: p.codigo || '',
+        ClienteSistema: p.clienteId ? 'Sim' : 'Não'
+      }));
+    }
+
+    function exportarPart(tipo) {
+      const rows = dadosExport();
+      if (!rows.length) { App.toast('Sem dados para exportar', 'info'); return; }
+      if (tipo === 'excel') {
+        if (typeof XLSX === 'undefined') { App.toast('Biblioteca Excel não carregou', 'error'); return; }
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Participantes');
+        XLSX.writeFile(wb, 'participantes-bonus-especial.xlsx');
+        return;
+      }
+      const be = (cfgCache && cfgCache.bonusEspecial) || {};
+      const titulo = 'Relatório — Participantes Bónus Especial';
+      const meta = 'Campanha: ' + (be.nome || '') + ' · ' + (be.campanhaId || '');
+      let table = '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%"><thead><tr>';
+      Object.keys(rows[0]).forEach(k => { table += '<th>' + k + '</th>'; });
+      table += '</tr></thead><tbody>';
+      rows.forEach(r => {
+        table += '<tr>';
+        Object.keys(rows[0]).forEach(k => { table += '<td>' + String(r[k] || '').replace(/</g,'&lt;') + '</td>'; });
+        table += '</tr>';
+      });
+      table += '</tbody></table>';
+      const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + titulo + '</title></head><body style="font-family:Arial;padding:24px">' +
+        '<h1>' + titulo + '</h1><p>' + meta + '</p>' + table + '</body></html>';
+      if (tipo === 'pdf') {
+        const w = window.open('', '_blank');
+        if (!w) { App.toast('Permita pop-ups', 'error'); return; }
+        w.document.write(html);
+        w.document.close();
+        setTimeout(() => { w.focus(); w.print(); }, 400);
+        App.toast('Escolha "Guardar como PDF" na impressão', 'info', 4000);
+      } else {
+        const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'participantes-bonus-especial.doc';
+        a.click();
+      }
+    }
+
+    carregarTudo();
+  </script>
+</body>
+</html>
