@@ -346,6 +346,29 @@
       return { kpis: kpis, topRows: topRows, histRows: histRows, series: series, periodo: periodoLabel(), gerado: new Date().toLocaleString('pt-PT') };
     }
 
+
+    function montarHtmlCorpoRelatorio(dados) {
+      var kpiHtml = dados.kpis.map(function(k) {
+        return '<div style="display:inline-block;min-width:120px;margin:6px 10px 6px 0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px"><div style="font-size:11px;color:#64748b">' + k.label + '</div><div style="font-size:18px;font-weight:700">' + k.value + '</div></div>';
+      }).join('');
+      var topHtml = dados.topRows.length
+        ? '<table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">#</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Cliente</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Telefone</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Peças</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Compras</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Valor</th></tr></thead><tbody>' +
+          dados.topRows.map(function(r) { return '<tr>' + r.map(function(c) { return '<td style="border:1px solid #e2e8f0;padding:8px">' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'
+        : '<p>Sem dados</p>';
+      var histHtml = dados.histRows.length
+        ? '<table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Cliente</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Evento</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Detalhe</th><th style="border:1px solid #e2e8f0;padding:8px;background:#f1f5f9">Data</th></tr></thead><tbody>' +
+          dados.histRows.map(function(r) { return '<tr>' + r.map(function(c) { return '<td style="border:1px solid #e2e8f0;padding:8px">' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'
+        : '<p>Sem eventos</p>';
+      return '<style>@media print{#docPrintView .toolbar-doc{display:none!important}body>*:not(#docPrintView){display:none!important}#docPrintView{position:static!important;overflow:visible!important;background:#fff!important}}</style>' +
+        '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px;color:#0f172a;font-family:Arial,Helvetica,sans-serif">' +
+        '<h1 style="color:#4f46e5;margin:0 0 8px;font-size:26px">Relatório</h1>' +
+        '<div style="color:#64748b;font-size:13px;margin-bottom:20px">Período: <strong>' + dados.periodo + '</strong> · Gerado em ' + dados.gerado + '</div>' +
+        '<h2 style="margin-top:28px;font-size:16px;border-bottom:2px solid #6366f1;padding-bottom:6px">Indicadores</h2>' + kpiHtml +
+        '<h2 style="margin-top:28px;font-size:16px;border-bottom:2px solid #6366f1;padding-bottom:6px">Top clientes</h2>' + topHtml +
+        '<h2 style="margin-top:28px;font-size:16px;border-bottom:2px solid #6366f1;padding-bottom:6px">Histórico de eventos</h2>' + histHtml +
+        '<p style="margin-top:40px;font-size:12px;color:#94a3b8">Documento gerado pelo sistema Bónus Lodja</p></div>';
+    }
+
     function montarHtmlRelatorio(dados) {
       var kpiHtml = dados.kpis.map(function(k) {
         return '<div style="display:inline-block;min-width:120px;margin:6px 10px 6px 0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px"><div style="font-size:11px;color:#64748b">' + k.label + '</div><div style="font-size:18px;font-weight:700">' + k.value + '</div></div>';
@@ -384,17 +407,38 @@
         '</div></body></html>';
     }
 
+    function fecharDocView() {
+      var el = document.getElementById('docPrintView');
+      if (el) el.remove();
+      document.body.style.overflow = '';
+    }
+
+    function abrirDocView(htmlConteudo) {
+      fecharDocView();
+      var wrap = document.createElement('div');
+      wrap.id = 'docPrintView';
+      wrap.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:#f8fafc;overflow:auto;-webkit-overflow-scrolling:touch;');
+      wrap.innerHTML = '' +
+        '<div class="toolbar-doc" style="position:sticky;top:0;z-index:2;display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 14px;box-shadow:0 4px 12px rgba(15,23,42,.06)">' +
+        '<button type="button" id="btnDocVoltar" style="display:inline-flex;align-items:center;gap:6px;background:#0f172a;color:#fff;border:none;border-radius:10px;padding:12px 16px;font-weight:600;font-size:14px;cursor:pointer;min-height:44px">← Voltar ao Menu Principal</button>' +
+        '<button type="button" id="btnDocImprimir" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:10px;padding:12px 16px;font-weight:600;font-size:14px;cursor:pointer;min-height:44px">🖨 Imprimir</button>' +
+        '</div><div id="docPrintBody" style="padding:16px;max-width:900px;margin:0 auto"></div>';
+      document.body.appendChild(wrap);
+      document.body.style.overflow = 'hidden';
+      document.getElementById('docPrintBody').innerHTML = htmlConteudo;
+      document.getElementById('btnDocVoltar').onclick = function () { fecharDocView(); };
+      document.getElementById('btnDocImprimir').onclick = function () {
+        try { window.print(); }
+        catch (e) { App.toast('Use a partilha do telemóvel ou a opção Imprimir do sistema.', 'info', 4000); }
+      };
+    }
+
     function exportarPDF() {
       try {
         var dados = coletarDadosRelatorio();
-        var html = montarHtmlRelatorio(dados);
-        var w = window.open('', '_blank');
-        if (!w) { App.toast('Permita pop-ups para exportar PDF', 'error'); return; }
-        w.document.open();
-        w.document.write(html);
-        w.document.close();
-        setTimeout(function() { w.focus(); w.print(); }, 500);
-        App.toast('Na impressão escolha "Guardar como PDF"', 'info', 4500);
+        var corpo = montarHtmlCorpoRelatorio(dados);
+        abrirDocView(corpo);
+        App.toast('Use Imprimir e escolha "Guardar como PDF" se quiser ficheiro', 'info', 4000);
       } catch (e) {
         console.error(e);
         App.toast('Erro PDF: ' + (e.message || e), 'error');

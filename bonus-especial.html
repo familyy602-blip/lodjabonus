@@ -66,11 +66,30 @@
       margin: 16px 0 8px;
     }
     .hint { font-size: 13px; color: #64748b; margin-top: 8px; }
-    .off {
-      color: #94a3b8;
-      font-size: 15px;
-    }
+    .off { color: #94a3b8; font-size: 15px; }
     a.voltar { display: inline-block; margin-top: 24px; color: #a5b4fc; font-size: 14px; }
+    .form-acesso { text-align: left; margin-top: 8px; }
+    .form-acesso label {
+      display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; font-weight: 500;
+    }
+    .form-acesso input {
+      width: 100%; padding: 12px 14px; background: #0f172a; border: 1px solid #334155;
+      border-radius: 10px; color: #f1f5f9; font-size: 16px; font-family: inherit; margin-bottom: 14px;
+    }
+    .form-acesso input:focus {
+      outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.25);
+    }
+    .btn-confirmar {
+      width: 100%; padding: 14px; background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600;
+      cursor: pointer; margin-top: 4px; min-height: 48px;
+    }
+    .btn-confirmar:disabled { opacity: 0.6; cursor: not-allowed; }
+    .erro-form {
+      display: none; background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.35);
+      border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; text-align: left;
+    }
+    .erro-form.show { display: block; }
   </style>
 </head>
 <body>
@@ -82,6 +101,111 @@
   <script src="storage.js"></script>
   <script>
     initSupabase();
+
+    function escapeHtml(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function normalizarTelefone(t) {
+      return String(t || '').replace(/\D/g, '');
+    }
+
+    function mostrarBonus(be, cliente) {
+      const box = document.getElementById('box');
+      const saudacao = cliente && cliente.nome
+        ? `<p class="hint" style="margin-bottom:12px;color:#a5b4fc">Olá, ${escapeHtml(cliente.nome)}!</p>`
+        : '';
+      box.innerHTML = `
+        <div class="badge">🔥 Bónus especial</div>
+        ${saudacao}
+        <h1>${escapeHtml(be.nome)}</h1>
+        <p class="desc">${escapeHtml(be.descricao || 'Apresente esta oferta no balcão ao fazer a sua compra.')}</p>
+        ${be.codigo ? `<div class="codigo">${escapeHtml(be.codigo)}</div><p class="hint">Mostre este código na loja</p>` : ''}
+        <a class="voltar" href="roleta.html">Ir para a roleta</a>
+      `;
+    }
+
+    function mostrarFormulario(be) {
+      const box = document.getElementById('box');
+      box.innerHTML = `
+        <div class="badge">🔥 Bónus especial</div>
+        <h1>Aceder à oferta</h1>
+        <p class="desc" style="margin-bottom:18px">Preencha os seus dados para ver o bónus especial. Se já for cliente, usamos o registo existente.</p>
+        <div class="erro-form" id="erroAcesso"></div>
+        <form class="form-acesso" id="formAcesso">
+          <label for="nomeAcesso">Nome completo *</label>
+          <input type="text" id="nomeAcesso" name="nome" required autocomplete="name" placeholder="O seu nome">
+          <label for="telAcesso">Contacto / WhatsApp *</label>
+          <input type="tel" id="telAcesso" name="telefone" required autocomplete="tel" placeholder="8XXXXXXXX" inputmode="numeric">
+          <button type="submit" class="btn-confirmar" id="btnAcesso">Confirmar e ver bónus</button>
+        </form>
+      `;
+
+      document.getElementById('formAcesso').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const erroEl = document.getElementById('erroAcesso');
+        const btn = document.getElementById('btnAcesso');
+        erroEl.classList.remove('show');
+        erroEl.textContent = '';
+
+        const nome = document.getElementById('nomeAcesso').value.trim();
+        const telefone = normalizarTelefone(document.getElementById('telAcesso').value);
+
+        if (!nome || nome.length < 2) {
+          erroEl.textContent = 'Introduza o seu nome.';
+          erroEl.classList.add('show');
+          return;
+        }
+        if (!telefone || telefone.length < 8) {
+          erroEl.textContent = 'Introduza um contacto/WhatsApp válido (mín. 8 dígitos).';
+          erroEl.classList.add('show');
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'A registar...';
+
+        try {
+          const clientes = await Storage.getClientes();
+          let cliente = clientes.find(c => normalizarTelefone(c.telefone) === telefone);
+
+          if (cliente) {
+            // Já existe — não duplicar; actualizar nome se estiver vazio
+            if ((!cliente.nome || cliente.nome.length < 2) && nome) {
+              try { await Storage.updateCliente(cliente.id, { nome }); } catch (e) {}
+              cliente.nome = nome;
+            }
+          } else {
+            cliente = await Storage.addCliente({
+              nome,
+              telefone,
+              totalPecas: 0,
+              totalCompras: 0,
+              noGrupoWhatsapp: false,
+              estado: 'activo'
+            });
+          }
+
+          try {
+            sessionStorage.setItem('bonus_especial_cliente', JSON.stringify({
+              id: cliente.id,
+              nome: cliente.nome,
+              telefone: cliente.telefone,
+              ts: Date.now()
+            }));
+          } catch (e) {}
+
+          mostrarBonus(be, cliente);
+        } catch (err) {
+          console.error(err);
+          erroEl.textContent = 'Erro de ligação. Verifique a internet e tente de novo.';
+          erroEl.classList.add('show');
+          btn.disabled = false;
+          btn.textContent = 'Confirmar e ver bónus';
+        }
+      });
+    }
+
     (async () => {
       const box = document.getElementById('box');
       try {
@@ -96,20 +220,25 @@
           `;
           return;
         }
-        box.innerHTML = `
-          <div class="badge">🔥 Bónus especial</div>
-          <h1>${escapeHtml(be.nome)}</h1>
-          <p class="desc">${escapeHtml(be.descricao || 'Apresente esta oferta no balcão ao fazer a sua compra.')}</p>
-          ${be.codigo ? `<div class="codigo">${escapeHtml(be.codigo)}</div><p class="hint">Mostre este código na loja</p>` : ''}
-          <a class="voltar" href="roleta.html">Ir para a roleta</a>
-        `;
+
+        // Se já preencheu nesta sessão, ir directo ao bónus
+        try {
+          const raw = sessionStorage.getItem('bonus_especial_cliente');
+          if (raw) {
+            const saved = JSON.parse(raw);
+            if (saved && saved.telefone && saved.ts && (Date.now() - saved.ts) < 24 * 60 * 60 * 1000) {
+              mostrarBonus(be, saved);
+              return;
+            }
+          }
+        } catch (e) {}
+
+        mostrarFormulario(be);
       } catch (e) {
+        console.error(e);
         box.innerHTML = `<p class="off">Não foi possível carregar a oferta. Verifique a ligação.</p>`;
       }
     })();
-    function escapeHtml(s) {
-      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
   </script>
 </body>
 </html>
