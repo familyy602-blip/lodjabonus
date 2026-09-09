@@ -217,20 +217,27 @@
           App.toast('Não há clientes na base de dados Supabase', 'warning');
           return;
         }
+        // Um só identificador: Código do cliente (= referência no sistema/Supabase)
+        // O id técnico interno não é exportado para evitar redundância
         const rows = [
-          ['ID', 'Nome do Cliente', 'Contacto', 'Código', 'Total Peças', 'Total Compras',
+          ['Código', 'Nome do Cliente', 'Contacto', 'Total Peças', 'Total Compras',
            '1ª', '2ª', '3ª', '4ª', '5ª',
            'Grupo WhatsApp', 'Elegível', 'Estado', 'Último Prémio', 'Código Prémio', 'Data Cadastro']
         ];
-        clientes.forEach(c => {
+        clientes.forEach((c, idx) => {
           const n = c.totalPecas || 0;
           const checks = [];
           for (let i = 1; i <= 5; i++) checks.push(i <= n ? 'Sim' : '');
+          // Preferir codigoCliente; se vazio, usar referência curta derivada do id Supabase
+          let codigo = (c.codigoCliente || '').trim();
+          if (!codigo && c.id) {
+            codigo = String(c.id).replace(/^cli_/, '').slice(0, 12).toUpperCase();
+          }
+          if (!codigo) codigo = 'CLI' + String(idx + 1).padStart(3, '0');
           rows.push([
-            c.id || '',
+            codigo,
             c.nome || '',
             c.telefone || '',
-            c.codigoCliente || '',
             n,
             c.totalCompras || 0,
             checks[0], checks[1], checks[2], checks[3], checks[4],
@@ -244,7 +251,7 @@
         });
         const ws = XLSX.utils.aoa_to_sheet(rows);
         ws['!cols'] = [
-          { wch: 18 }, { wch: 24 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
+          { wch: 14 }, { wch: 24 }, { wch: 14 }, { wch: 12 }, { wch: 12 },
           { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 },
           { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 20 }
         ];

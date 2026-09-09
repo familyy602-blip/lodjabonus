@@ -90,11 +90,16 @@ const Storage = {
 
   async addCliente(cliente) {
     const id = this.generateId('cli_');
+    // Código de negócio único; se não vier, deriva do mesmo id gravado no Supabase
+    let codigoCliente = (cliente.codigoCliente || '').trim();
+    if (!codigoCliente) {
+      codigoCliente = id.replace(/^cli_/, '').slice(0, 10).toUpperCase();
+    }
     const novo = {
       id,
       nome: cliente.nome,
       telefone: cliente.telefone || '',
-      codigoCliente: cliente.codigoCliente || '',
+      codigoCliente,
       noGrupoWhatsapp: !!cliente.noGrupoWhatsapp,
       totalPecas: cliente.totalPecas || 0,
       totalCompras: cliente.totalCompras || 0,
