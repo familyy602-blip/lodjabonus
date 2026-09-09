@@ -188,25 +188,34 @@
 
         let sessao = null;
         try { sessao = JSON.parse(sessionStorage.getItem('bonus_especial_sessao') || 'null'); } catch (e) {}
-        if (!sessao || !sessao.clienteId || sessao.campanhaId !== campanhaId) {
+        if (!sessao || !sessao.participanteId || sessao.campanhaId !== campanhaId) {
           window.location.href = 'bonus-especial.html';
           return;
         }
 
-        const cliente = await Storage.getClienteById(sessao.clienteId);
-        if (!cliente) {
+        const participante = await Storage.getParticipanteBonusById(sessao.participanteId);
+        if (!participante) {
           window.location.href = 'bonus-especial.html';
           return;
         }
+        if (participante.estado === 'concluido' || participante.premioNome) {
+          app.innerHTML = `
+            <div class="roleta-header">
+              <div class="badge-loja">Bónus Especial</div>
+              <h1>Já participou</h1>
+              <p class="subtitulo">Este contacto já realizou o Bónus Especial.<br>Aguarde pelo anúncio de um novo Bónus.</p>
+            </div>`;
+          return;
+        }
 
-        renderRoletaBonusEspecial(cliente, campanhaId, be);
+        renderRoletaBonusEspecial(participante, campanhaId, be);
       } catch (e) {
         console.error(e);
         app.innerHTML = `<div class="roleta-header"><h1>Erro</h1><p class="subtitulo">Não foi possível carregar a roleta.</p></div>`;
       }
     }
 
-    async function renderRoletaBonusEspecial(cliente, campanhaId, be) {
+    async function renderRoletaBonusEspecial(participante, campanhaId, be) {
       const premios = (await Storage.getPremios()).filter(p => p.activo);
       if (!premios.length) {
         app.innerHTML = `<div class="roleta-header"><h1>Sem prémios</h1><p class="subtitulo">Contacte a loja.</p></div>`;
@@ -217,8 +226,8 @@
         <div class="roleta-header">
           <div class="badge-loja">🔥 Bónus Especial</div>
           <h1>${(be && be.nome) ? be.nome : 'Roleta Especial'}</h1>
-          <p class="cliente-nome">${cliente.nome || ''}</p>
-          <p class="subtitulo">Uma participação por dispositivo nesta campanha</p>
+          <p class="cliente-nome">${participante.nome || ''}</p>
+          <p class="subtitulo">Uma participação por contacto/dispositivo nesta campanha</p>
         </div>
         <div class="wheel-wrapper">
           <div class="wheel-pointer"></div>
@@ -235,7 +244,7 @@
         btn.disabled = true;
         btn.textContent = 'A girar...';
 
-        const resultado = await Storage.realizarSorteioBonusEspecial(cliente.id, campanhaId);
+        const resultado = await Storage.realizarSorteioBonusEspecial(participante.id, campanhaId);
         if (resultado.erro) {
           alert(resultado.erro);
           btn.disabled = false;

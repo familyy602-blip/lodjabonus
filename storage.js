@@ -334,7 +334,8 @@ const Storage = {
   },
 
 
-  // ----- BONUS ESPECIAL -----
+
+  // ----- BONUS ESPECIAL (tabela própria, NÃO usa "clientes") -----
   getDeviceId() {
     try {
       let id = localStorage.getItem('lodja_device_id');
@@ -354,69 +355,156 @@ const Storage = {
     return be.campanhaId || null;
   },
 
-  async jaParticipouBonusEspecial(campanhaId, deviceId) {
+  _mapBonusPart(r) {
+    if (!r) return null;
+    return {
+      id: r.id,
+      campanhaId: r.campanha_id,
+      clienteId: r.cliente_id || null,
+      nome: r.cliente_nome || '',
+      telefone: r.cliente_telefone || '',
+      deviceId: r.device_id,
+      premioId: r.premio_id || null,
+      premioNome: r.premio_nome || null,
+      premioDescricao: r.premio_descricao || null,
+      codigo: r.codigo || null,
+      dataParticipacao: r.data_participacao,
+      estado: r.estado || 'registado'
+    };
+  },
+
+  async getParticipantesBonusEspecial(campanhaId) {
+    let q = this._db().from('bonus_especial_participacoes').select('*').order('data_participacao', { ascending: false });
+    if (campanhaId) q = q.eq('campanha_id', campanhaId);
+    const { data, error } = await q;
+    if (error) { console.error(error); return []; }
+    return (data || []).map(r => this._mapBonusPart(r));
+  },
+
+  async jaParticipouBonusEspecial(campanhaId, deviceId, telefone) {
     if (!campanhaId) return false;
     const dev = deviceId || this.getDeviceId();
+    const tel = String(telefone || '').replace(/\D/g, '');
     try {
       if (localStorage.getItem('bonus_esp_done_' + campanhaId) === '1') return true;
     } catch (e) {}
     try {
       if (!window.supabaseClient) return false;
-      const { data, error } = await this._db()
+      // Já jogou neste dispositivo (estado concluido)
+      const { data: byDev, error: e1 } = await this._db()
         .from('bonus_especial_participacoes')
-        .select('id')
+        .select('id, estado, premio_nome')
         .eq('campanha_id', campanhaId)
         .eq('device_id', dev)
-        .limit(1);
-      if (error) {
-        console.error('jaParticipouBonusEspecial', error);
-        try { return localStorage.getItem('bonus_esp_done_' + campanhaId) === '1'; } catch (e) { return false; }
+        .limit(5);
+      if (!e1 && byDev) {
+        if (byDev.some(r => r.estado === 'concluido' || r.premio_nome)) return true;
       }
-      return !!(data && data.length);
+      // Já jogou com este telefone (outro dispositivo)
+      if (tel && tel.length >= 8) {
+        const { data: byTel, error: e2 } = await this._db()
+          .from('bonus_especial_participacoes')
+          .select('id, estado, premio_nome')
+          .eq('campanha_id', campanhaId)
+          .eq('cliente_telefone', tel)
+          .limit(5);
+        if (!e2 && byTel) {
+          if (byTel.some(r => r.estado === 'concluido' || r.premio_nome)) return true;
+        }
+      }
+      return false;
     } catch (e) {
-      console.error('jaParticipouBonusEspecial exception', e);
+      console.error('jaParticipouBonusEspecial', e);
       try { return localStorage.getItem('bonus_esp_done_' + campanhaId) === '1'; } catch (e2) { return false; }
     }
   },
 
-  async gerarTokenBonusEspecial(clienteId) {
-    const cliente = await this.getClienteById(clienteId);
-    if (!cliente) return null;
-    // Token próprio para o bónus especial (não exige elegível / 5 peças)
-    const token = 'be_' + this.generateToken();
-    await this.updateCliente(clienteId, {
-      token,
-      tokenUsado: false,
-      dataTokenGerado: new Date().toISOString()
-    });
-    return token;
+  /** Regista participante SÓ na tabela do bónus (não cria em clientes) */
+  async registarParticipanteBonusEspecial({ nome, telefone, campanhaId }) {
+    const deviceId = this.getDeviceId();
+    const tel = String(telefone || '').replace(/\D/g, '');
+    if (!campanhaId) throw new Error('Campanha inválida');
+    if (!nome || !tel) throw new Error('Nome e contacto são obrigatórios');
+
+    // Já concluiu roleta?
+    if (await this.jaParticipouBonusEspecial(campanhaId, deviceId, tel)) {
+      return { erro: 'Este contacto ou dispositivo já realizou o Bónus Especial. Aguarde pelo anúncio de um novo Bónus.' };
+    }
+
+    // Reutilizar registo pendente (mesmo telefone ou device, ainda não jogou)
+    const { data: existentes } = await this._db()
+      .from('bonus_especial_participacoes')
+      .select('*')
+      .eq('campanha_id', campanhaId)
+      .or(`device_id.eq.${deviceId},cliente_telefone.eq.${tel}`)
+      .limit(10);
+
+    const pendente = (existentes || []).find(r => r.estado !== 'concluido' && !r.premio_nome);
+    if (pendente) {
+      // actualizar nome se necessário
+      await this._db().from('bonus_especial_participacoes').update({
+        cliente_nome: nome,
+        cliente_telefone: tel,
+        device_id: deviceId
+      }).eq('id', pendente.id);
+      return { sucesso: true, participante: this._mapBonusPart({ ...pendente, cliente_nome: nome, cliente_telefone: tel, device_id: deviceId }) };
+    }
+
+    const row = {
+      id: this.generateId('bep_'),
+      campanha_id: campanhaId,
+      cliente_id: null,
+      cliente_nome: nome,
+      cliente_telefone: tel,
+      device_id: deviceId,
+      premio_id: null,
+      premio_nome: null,
+      premio_descricao: null,
+      codigo: null,
+      data_participacao: new Date().toISOString(),
+      estado: 'registado'
+    };
+    const { error } = await this._db().from('bonus_especial_participacoes').insert(row);
+    if (error) {
+      console.error(error);
+      if (error.code === '23505') {
+        return { erro: 'Este dispositivo já está registado nesta campanha.' };
+      }
+      throw error;
+    }
+    return { sucesso: true, participante: this._mapBonusPart(row) };
   },
 
-  async realizarSorteioBonusEspecial(clienteId, campanhaId) {
+  async getParticipanteBonusById(id) {
+    const { data, error } = await this._db().from('bonus_especial_participacoes').select('*').eq('id', id).maybeSingle();
+    if (error || !data) return null;
+    return this._mapBonusPart(data);
+  },
+
+  async realizarSorteioBonusEspecial(participanteId, campanhaId) {
     const deviceId = this.getDeviceId();
     if (!campanhaId) return { erro: 'Não há campanha de bónus especial activa' };
 
-    const ja = await this.jaParticipouBonusEspecial(campanhaId, deviceId);
-    if (ja) {
-      return { erro: 'Este dispositivo já participou no Bónus Especial. Aguarde pelo anúncio de um novo Bónus.' };
+    const part = await this.getParticipanteBonusById(participanteId);
+    if (!part) return { erro: 'Registo de participante não encontrado' };
+    if (part.campanhaId !== campanhaId) return { erro: 'Campanha inválida' };
+
+    if (part.estado === 'concluido' || part.premioNome) {
+      try { localStorage.setItem('bonus_esp_done_' + campanhaId, '1'); } catch (e) {}
+      return { erro: 'Este participante já realizou o Bónus Especial. Aguarde pelo anúncio de um novo Bónus.' };
     }
 
-    const cliente = await this.getClienteById(clienteId);
-    if (!cliente) return { erro: 'Cliente não encontrado' };
+    if (await this.jaParticipouBonusEspecial(campanhaId, deviceId, part.telefone)) {
+      return { erro: 'Este dispositivo ou contacto já participou no Bónus Especial. Aguarde pelo anúncio de um novo Bónus.' };
+    }
 
     const premio = await this.sortearPremio();
     if (!premio) return { erro: 'Nenhum prémio configurado' };
 
     const codigo = this.generatePrizeCode(premio.nome);
     const agora = new Date().toISOString();
-    const partId = this.generateId('bep_');
 
-    const partRow = {
-      id: partId,
-      campanha_id: campanhaId,
-      cliente_id: cliente.id,
-      cliente_nome: cliente.nome,
-      cliente_telefone: cliente.telefone || '',
+    const { error: errUp } = await this._db().from('bonus_especial_participacoes').update({
       device_id: deviceId,
       premio_id: premio.id,
       premio_nome: premio.nome,
@@ -424,25 +512,19 @@ const Storage = {
       codigo,
       data_participacao: agora,
       estado: 'concluido'
-    };
+    }).eq('id', participanteId);
 
-    const { error: errPart } = await this._db().from('bonus_especial_participacoes').insert(partRow);
-    if (errPart) {
-      console.error(errPart);
-      // conflito unique = já participou
-      if (String(errPart.message || errPart.code || '').includes('duplicate') || errPart.code === '23505') {
-        try { localStorage.setItem('bonus_esp_done_' + campanhaId, '1'); } catch (e) {}
-        return { erro: 'Este dispositivo já participou no Bónus Especial. Aguarde pelo anúncio de um novo Bónus.' };
-      }
-      return { erro: 'Erro ao registar participação. Verifique se a tabela bonus_especial_participacoes existe no Supabase.' };
+    if (errUp) {
+      console.error(errUp);
+      return { erro: 'Erro ao guardar o resultado do sorteio.' };
     }
 
-    // Também regista em sorteios para o admin ver entregas
+    // Sorteio para o admin acompanhar entregas (sem exigir cliente na tabela clientes)
     const sorteioRow = {
       id: this.generateId('srt_'),
-      cliente_id: cliente.id,
-      cliente_nome: cliente.nome,
-      cliente_telefone: cliente.telefone || '',
+      cliente_id: part.clienteId || null,
+      cliente_nome: part.nome,
+      cliente_telefone: part.telefone || '',
       token: 'bonus_esp_' + campanhaId + '_' + deviceId,
       premio_id: premio.id,
       premio_nome: premio.nome,
@@ -453,21 +535,15 @@ const Storage = {
     };
     await this._db().from('sorteios').insert(sorteioRow);
 
-    await this.updateCliente(cliente.id, {
-      ultimoPremio: premio.nome,
-      ultimoCodigo: codigo,
-      dataSorteio: agora
-    });
-
     try { localStorage.setItem('bonus_esp_done_' + campanhaId, '1'); } catch (e) {}
 
     return {
       sucesso: true,
       sorteio: {
         id: sorteioRow.id,
-        clienteId: cliente.id,
-        clienteNome: cliente.nome,
-        clienteTelefone: cliente.telefone,
+        participanteId,
+        clienteNome: part.nome,
+        clienteTelefone: part.telefone,
         premioId: premio.id,
         premioNome: premio.nome,
         premioDescricao: premio.descricao,
@@ -477,6 +553,36 @@ const Storage = {
       },
       premio
     };
+  },
+
+  /** Copia participante do bónus para a tabela clientes */
+  async tornarClienteRegistado(participanteId) {
+    const part = await this.getParticipanteBonusById(participanteId);
+    if (!part) throw new Error('Participante não encontrado');
+    if (part.clienteId) {
+      return { sucesso: true, cliente: await this.getClienteById(part.clienteId), jaExistia: true };
+    }
+
+    const tel = String(part.telefone || '').replace(/\D/g, '');
+    const existentes = await this.getClientes();
+    let cliente = existentes.find(c => String(c.telefone || '').replace(/\D/g, '') === tel && tel.length >= 8);
+
+    if (!cliente) {
+      cliente = await this.addCliente({
+        nome: part.nome,
+        telefone: tel,
+        totalPecas: 0,
+        totalCompras: 0,
+        noGrupoWhatsapp: false,
+        estado: 'activo'
+      });
+    }
+
+    await this._db().from('bonus_especial_participacoes')
+      .update({ cliente_id: cliente.id })
+      .eq('id', participanteId);
+
+    return { sucesso: true, cliente, jaExistia: false };
   },
 
   // ----- CONFIG -----

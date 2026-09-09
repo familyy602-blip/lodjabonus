@@ -77,18 +77,16 @@
 
     function ensureSupabase() {
       if (window.supabaseClient) return true;
-      if (typeof initSupabase === 'function') {
-        initSupabase();
-      }
+      if (typeof initSupabase === 'function') initSupabase();
       return !!window.supabaseClient;
     }
 
-    function irParaRoletaEspecial(cliente, campanhaId) {
+    function irParaRoleta(participante, campanhaId) {
       try {
         sessionStorage.setItem('bonus_especial_sessao', JSON.stringify({
-          clienteId: cliente.id,
-          nome: cliente.nome,
-          telefone: cliente.telefone,
+          participanteId: participante.id,
+          nome: participante.nome,
+          telefone: participante.telefone,
           campanhaId: campanhaId,
           ts: Date.now()
         }));
@@ -96,11 +94,11 @@
       window.location.href = 'roleta.html?modo=especial';
     }
 
-    function mostrarBloqueado() {
+    function mostrarBloqueado(msg) {
       document.getElementById('box').innerHTML = `
         <div class="badge" style="background:#475569">Já participou</div>
         <h1>Bónus Especial</h1>
-        <p class="off">Este dispositivo já participou no Bónus Especial.<br><br>Aguarde pelo anúncio de um novo Bónus.</p>
+        <p class="off">${escapeHtml(msg || 'Este contacto ou dispositivo já realizou o Bónus Especial. Aguarde pelo anúncio de um novo Bónus.')}</p>
       `;
     }
 
@@ -109,7 +107,7 @@
       box.innerHTML = `
         <div class="badge">🔥 Bónus especial</div>
         <h1>${escapeHtml(be.nome || 'Bónus Especial')}</h1>
-        <p class="desc">${escapeHtml(be.descricao || 'Preencha os dados para girar a roleta do bónus especial.')}</p>
+        <p class="desc">${escapeHtml(be.descricao || 'Preencha os dados para girar a roleta. Não precisa de ser cliente da loja.')}</p>
         <div class="erro-form" id="erroAcesso"></div>
         <form class="form-acesso" id="formAcesso">
           <label for="nomeAcesso">Nome completo *</label>
@@ -140,18 +138,12 @@
         btn.disabled = true;
         btn.textContent = 'A registar...';
         try {
-          const clientes = await Storage.getClientes();
-          let cliente = clientes.find(c => normalizarTelefone(c.telefone) === telefone);
-          if (cliente) {
-            if ((!cliente.nome || cliente.nome.length < 2) && nome) {
-              try { await Storage.updateCliente(cliente.id, { nome }); cliente.nome = nome; } catch (e) {}
-            }
-          } else {
-            cliente = await Storage.addCliente({
-              nome, telefone, totalPecas: 0, totalCompras: 0, noGrupoWhatsapp: false, estado: 'activo'
-            });
+          const res = await Storage.registarParticipanteBonusEspecial({ nome, telefone, campanhaId });
+          if (res.erro) {
+            mostrarBloqueado(res.erro);
+            return;
           }
-          irParaRoletaEspecial(cliente, campanhaId);
+          irParaRoleta(res.participante, campanhaId);
         } catch (err) {
           console.error(err);
           erroEl.textContent = 'Erro ao registar: ' + (err.message || err);
@@ -165,86 +157,67 @@
     async function iniciar() {
       const box = document.getElementById('box');
       box.innerHTML = '<p class="off">A carregar...</p>';
-
-      if (typeof Storage === 'undefined' || typeof initSupabase !== 'function') {
-        box.innerHTML = `
-          <p class="off">Falha ao carregar os scripts do sistema.</p>
-          <button class="btn-retry" type="button" onclick="location.reload()">Tentar de novo</button>
-        `;
+      if (typeof Storage === 'undefined') {
+        box.innerHTML = '<p class="off">Falha ao carregar scripts.</p><button class="btn-retry" onclick="location.reload()">Tentar de novo</button>';
         return;
       }
-
       if (!ensureSupabase()) {
-        // espera curta pela CDN
         await new Promise(r => setTimeout(r, 400));
         if (!ensureSupabase()) {
-          box.innerHTML = `
-            <p class="off">Não foi possível ligar ao servidor (Supabase).<br>Verifique a internet.</p>
-            <button class="btn-retry" type="button" onclick="location.reload()">Tentar de novo</button>
-          `;
+          box.innerHTML = '<p class="off">Não foi possível ligar ao servidor.</p><button class="btn-retry" onclick="location.reload()">Tentar de novo</button>';
           return;
         }
       }
-
       try {
         const cfg = await Storage.getConfig();
         const be = (cfg && cfg.bonusEspecial) ? cfg.bonusEspecial : {};
-
         if (!be.activo || !be.nome) {
           box.innerHTML = `
             <div class="badge" style="background:#475569">Indisponível</div>
             <h1>Bónus especial</h1>
-            <p class="off">Neste momento não há bónus especial activo.<br>Peça na loja para activarem a campanha em <strong>Configurações</strong>.</p>
-          `;
+            <p class="off">Neste momento não há bónus especial activo.</p>`;
           return;
         }
-
         let campanhaId = be.campanhaId;
         if (!campanhaId) {
           campanhaId = 'camp_' + Date.now().toString(36);
           be.campanhaId = campanhaId;
           cfg.bonusEspecial = be;
-          try { await Storage.saveConfig(cfg); } catch (e) { console.warn('save campanhaId', e); }
+          try { await Storage.saveConfig(cfg); } catch (e) {}
         }
 
-        let ja = false;
-        try {
-          if (typeof Storage.jaParticipouBonusEspecial === 'function') {
-            ja = await Storage.jaParticipouBonusEspecial(campanhaId);
-          }
-        } catch (e) {
-          console.warn('check participacao', e);
-          try { ja = localStorage.getItem('bonus_esp_done_' + campanhaId) === '1'; } catch (e2) { ja = false; }
-        }
-        if (ja) { mostrarBloqueado(); return; }
-
+        // Sessão com participante ainda válido
         try {
           const raw = sessionStorage.getItem('bonus_especial_sessao');
           if (raw) {
             const s = JSON.parse(raw);
-            if (s && s.clienteId && s.campanhaId === campanhaId) {
-              window.location.href = 'roleta.html?modo=especial';
-              return;
+            if (s && s.participanteId && s.campanhaId === campanhaId) {
+              const part = await Storage.getParticipanteBonusById(s.participanteId);
+              if (part && (part.estado === 'concluido' || part.premioNome)) {
+                mostrarBloqueado();
+                return;
+              }
+              if (part) {
+                window.location.href = 'roleta.html?modo=especial';
+                return;
+              }
             }
           }
         } catch (e) {}
 
+        const ja = await Storage.jaParticipouBonusEspecial(campanhaId);
+        if (ja) { mostrarBloqueado(); return; }
+
         mostrarFormulario(be, campanhaId);
       } catch (e) {
         console.error(e);
-        box.innerHTML = `
-          <p class="off">Não foi possível carregar.<br><span style="font-size:12px;color:#64748b">${escapeHtml(e.message || String(e))}</span></p>
-          <button class="btn-retry" type="button" onclick="location.reload()">Tentar de novo</button>
-        `;
+        box.innerHTML = `<p class="off">Não foi possível carregar.<br><span style="font-size:12px">${escapeHtml(e.message || e)}</span></p>
+          <button class="btn-retry" onclick="location.reload()">Tentar de novo</button>`;
       }
     }
 
-    // arranque
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', iniciar);
-    } else {
-      iniciar();
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);
+    else iniciar();
   </script>
 </body>
 </html>

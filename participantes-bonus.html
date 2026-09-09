@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <script>
+    (function () {
+      try {
+        var path = location.pathname;
+        var dir = path.endsWith('/') ? path : path.replace(/\/[^\/]*$/, '/');
+        if (!document.querySelector('base')) {
+          var b = document.createElement('base');
+          b.href = location.origin + dir;
+          document.head.insertBefore(b, document.head.firstChild);
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover">
+  <title>Participantes Bónus Especial — Bónus Lodja</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">B</div>
+        <div><h1>Bónus Lodja - Compre e ganhe</h1><span>Painel Admin</span></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="clientes.html" class="nav-item"><span class="icon">👥</span> Clientes</a>
+        <a href="compras.html" class="nav-item"><span class="icon">🛒</span> Compras</a>
+        <a href="elegiveis.html" class="nav-item"><span class="icon">⭐</span> Elegíveis</a>
+        <a href="sorteios.html" class="nav-item"><span class="icon">🎡</span> Sorteios</a>
+        <a href="premios.html" class="nav-item"><span class="icon">🎁</span> Prémios</a>
+        <a href="entregas.html" class="nav-item"><span class="icon">📦</span> Entregas</a>
+        <a href="relatorios.html" class="nav-item"><span class="icon">📈</span> Relatórios</a>
+        <a href="participantes-bonus.html" class="nav-item active"><span class="icon">🔥</span> Participantes Bónus</a>
+        <a href="bonus-especial.html" class="nav-item" target="_blank"><span class="icon">🔗</span> Link Bónus Especial</a>
+        <a href="configuracoes.html" class="nav-item"><span class="icon">⚙️</span> Configurações</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" onclick="Auth.logout()"><span class="icon">🚪</span> Sair</button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay"></div>
+    <div class="main-content">
+      <header class="topbar">
+        <div class="d-flex align-center gap-2">
+          <button class="menu-toggle">☰</button>
+          <h2>Participantes do Bónus Especial</h2>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-outline" onclick="render()">Actualizar</button>
+        </div>
+      </header>
+      <div class="content">
+        <div class="card">
+          <div class="card-header">
+            <h3>Lista de participantes</h3>
+            <p class="text-muted" style="font-size:13px;margin:0">Registos apenas do Bónus Especial — não entram em Clientes até clicar em “Tornar Cliente Registado”.</p>
+          </div>
+          <div class="card-body" style="overflow-x:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Nome</th>
+                  <th>Contacto</th>
+                  <th>Estado</th>
+                  <th>Prémio</th>
+                  <th>Código</th>
+                  <th>Cliente?</th>
+                  <th>Acções</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaPart"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="storage.js"></script>
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+  <script>
+    initSupabase();
+    if (!Auth.requireAuth()) throw new Error('Não autenticado');
+
+    async function render() {
+      const cfg = await Storage.getConfig();
+      const campanhaId = (cfg.bonusEspecial && cfg.bonusEspecial.campanhaId) || null;
+      const lista = await Storage.getParticipantesBonusEspecial(campanhaId);
+      const tb = document.getElementById('tabelaPart');
+      if (!lista.length) {
+        tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Ainda sem participantes nesta campanha</td></tr>';
+        return;
+      }
+      tb.innerHTML = lista.map(p => {
+        const jogou = p.estado === 'concluido' || p.premioNome;
+        const isCliente = !!p.clienteId;
+        return `<tr>
+          <td>${App.formatDateTime(p.dataParticipacao)}</td>
+          <td>${App.escapeHtml(p.nome)}</td>
+          <td>${App.escapeHtml(p.telefone)}</td>
+          <td>${jogou ? '<span class="text-success">Jogou</span>' : '<span class="text-muted">Só registado</span>'}</td>
+          <td>${App.escapeHtml(p.premioNome || '—')}</td>
+          <td>${App.escapeHtml(p.codigo || '—')}</td>
+          <td>${isCliente ? '<span class="text-success">Sim</span>' : 'Não'}</td>
+          <td>${isCliente
+            ? '<span class="text-muted">Já no sistema</span>'
+            : `<button class="btn btn-primary btn-sm" onclick="tornarCliente('${p.id}')">Tornar Cliente Registado</button>`}
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function tornarCliente(id) {
+      if (!App.confirm('Tem certeza de que deseja registar este cliente no sistema?')) return;
+      try {
+        const res = await Storage.tornarClienteRegistado(id);
+        if (res.jaExistia) {
+          App.toast('Este contacto já existia em Clientes. Ligação actualizada.', 'info');
+        } else {
+          App.toast('Cliente registado na tabela principal!', 'success');
+        }
+        await render();
+      } catch (e) {
+        console.error(e);
+        App.toast('Erro: ' + (e.message || e), 'error');
+      }
+    }
+
+    render();
+  </script>
+</body>
+</html>
