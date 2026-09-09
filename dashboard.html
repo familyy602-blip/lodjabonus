@@ -64,7 +64,7 @@
           <input type="file" id="fileImport" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importarFicheiro(event)">
           <button class="btn btn-outline btn-sm" onclick="document.getElementById('fileImport').click()">📂 Importar Excel</button>
           <button class="btn btn-outline btn-sm" onclick="exportarExcel()">⬇ Descarregar Excel</button>
-          <button class="btn btn-outline btn-sm" onclick="reimportarLimpo()">📥 Limpar e carregar lista da loja</button>
+          <button class="btn btn-outline btn-sm" onclick="importarListaLoja()">📥 Importar lista da loja</button>
         </div>
 </header>
 
@@ -210,41 +210,57 @@
           App.toast('Biblioteca Excel não carregou. Verifique a internet.', 'error');
           return;
         }
+        App.toast('A ler clientes actualizados do Supabase...', 'info', 2000);
+        // Sempre do Supabase — dados mais recentes na nuvem
         const clientes = await Storage.getClientes();
         if (!clientes.length) {
-          App.toast('Não há clientes para descarregar', 'warning');
+          App.toast('Não há clientes na base de dados Supabase', 'warning');
           return;
         }
-        // Mesmo estilo da planilha da loja
         const rows = [
-          ['Nome do Cliente', '1ª Compra', '2ª Compra', '3ª Compra', '4ª Compra', '5ª Compra', 'Total Peças', 'Contacto', 'Grupo WhatsApp', 'Elegível', 'Código', 'Estado']
+          ['ID', 'Nome do Cliente', 'Contacto', 'Código', 'Total Peças', 'Total Compras',
+           '1ª', '2ª', '3ª', '4ª', '5ª',
+           'Grupo WhatsApp', 'Elegível', 'Estado', 'Último Prémio', 'Código Prémio', 'Data Cadastro']
         ];
         clientes.forEach(c => {
           const n = c.totalPecas || 0;
           const checks = [];
-          for (let i = 1; i <= 5; i++) {
-            checks.push(i <= n ? '✅' : '');
-          }
+          for (let i = 1; i <= 5; i++) checks.push(i <= n ? 'Sim' : '');
           rows.push([
+            c.id || '',
             c.nome || '',
-            checks[0], checks[1], checks[2], checks[3], checks[4],
-            n,
             c.telefone || '',
+            c.codigoCliente || '',
+            n,
+            c.totalCompras || 0,
+            checks[0], checks[1], checks[2], checks[3], checks[4],
             c.noGrupoWhatsapp ? 'Sim' : 'Não',
             c.elegivel ? 'Sim' : 'Não',
-            c.codigoCliente || '',
-            c.estado || 'activo'
+            c.estado || 'activo',
+            c.ultimoPremio || '',
+            c.ultimoCodigo || '',
+            c.dataCadastro || ''
           ]);
         });
         const ws = XLSX.utils.aoa_to_sheet(rows);
         ws['!cols'] = [
-          { wch: 22 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
-          { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 10 }
+          { wch: 18 }, { wch: 24 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
+          { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 },
+          { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 20 }
         ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
-        XLSX.writeFile(wb, 'base-dados-clientes-bonus-loja.xlsx');
-        App.toast('Excel descarregado!', 'success');
+        // Folha meta
+        const meta = [
+          ['Fonte', 'Supabase (nuvem)'],
+          ['Registos', clientes.length],
+          ['Exportado em', new Date().toLocaleString('pt-PT')],
+          ['Sistema', 'Bónus Lodja']
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(meta), 'Info');
+        const nome = 'clientes-supabase-' + new Date().toISOString().slice(0, 10) + '.xlsx';
+        XLSX.writeFile(wb, nome);
+        App.toast('Excel gerado a partir do Supabase (' + clientes.length + ' clientes)', 'success', 4500);
       } catch (e) {
         console.error(e);
         App.toast('Erro ao exportar Excel: ' + (e.message || e), 'error');
@@ -399,18 +415,33 @@
     }
 
 
-    async function reimportarLimpo() {
-      if (!App.confirm('Isto APAGA os clientes actuais (incluindo erros como Blusas/Total) e carrega a lista correcta da loja. Continuar?')) return;
+    async function importarListaLoja() {
+      if (!App.confirm(
+        'Importar a lista base da loja para o Supabase?\n\n' +
+        '• Os clientes que JÁ existem (mesmo nome ou contacto) NÃO são apagados.\n' +
+        '• Apenas são adicionados os que ainda não estão na base de dados.\n\n' +
+        'Continuar?'
+      )) return;
       try {
-        App.toast('A limpar e a importar para o Supabase...', 'info');
-        const result = await Storage.limparEReimportarLoja();
-        App.toast(`${result.msg} (${result.total || result.clientes} clientes, ${result.elegiveis} elegíveis)`, 'success', 6000);
+        App.toast('A importar lista da loja para o Supabase (sem apagar dados)...', 'info');
+        const result = await Storage.importarListaLoja();
+        App.toast(
+          (result.msg || 'Importação concluída') +
+          ' — novos: ' + (result.clientes || 0) +
+          ', total na BD: ' + (result.total || '—') +
+          ', elegíveis: ' + (result.elegiveis || 0),
+          'success',
+          6500
+        );
         await renderAll();
       } catch (e) {
         console.error(e);
-        App.toast('Erro: ' + (e.message || e), 'error');
+        App.toast('Erro na importação: ' + (e.message || e), 'error');
       }
     }
+
+    // Compatibilidade com chamadas antigas
+    async function reimportarLimpo() { return importarListaLoja(); }
 
     async function seedDemo() {
       if (!App.confirm('Importar os clientes do Excel para o Supabase?')) return;

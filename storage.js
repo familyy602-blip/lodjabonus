@@ -27,6 +27,7 @@ const Storage = {
 
   // ----- CLIENTES -----
   async getClientes() {
+    // Sempre lê do Supabase (fonte de verdade) — sem cache local
     const { data, error } = await this._db().from('clientes').select('*').order('data_cadastro', { ascending: false });
     if (error) { console.error(error); return []; }
     return (data || []).map(r => this._mapClienteFromDb(r));
@@ -839,19 +840,18 @@ const Storage = {
   },
 
 
-  async limparEReimportarLoja() {
-    // Apaga tudo e carrega a lista completa e correcta do Excel da loja
-    try {
-      await this._db().from('sorteios').delete().neq('id', '');
-    } catch (e) { console.warn('sorteios', e); }
-    try {
-      await this._db().from('compras').delete().neq('id', '');
-    } catch (e) { console.warn('compras', e); }
-    try {
-      await this._db().from('clientes').delete().neq('id', '');
-    } catch (e) { console.warn('clientes', e); }
+  /**
+   * Importa a lista base da loja para o Supabase SEM apagar dados existentes.
+   * Clientes já presentes (mesmo telefone ou nome) são ignorados.
+   */
+  async importarListaLoja() {
+    return await this.seedDemo(false);
+  },
 
-    return await this.seedDemo(true);
+  /** @deprecated Use importarListaLoja — não apaga dados */
+  async limparEReimportarLoja() {
+    console.warn('limparEReimportarLoja está desactivado por segurança. A usar importarListaLoja (sem apagar).');
+    return await this.importarListaLoja();
   },
 
   async seedDemo(forcar = false) {
@@ -912,7 +912,7 @@ const Storage = {
     const todos = await this.getClientes();
     const elegiveis = todos.filter(c => c.elegivel).length;
     return {
-      msg: 'Base de dados da loja carregada no Supabase!',
+      msg: 'Lista da loja importada no Supabase (sem apagar existentes)',
       clientes: importados,
       total: todos.length,
       elegiveis
