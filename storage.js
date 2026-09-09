@@ -357,22 +357,26 @@ const Storage = {
   async jaParticipouBonusEspecial(campanhaId, deviceId) {
     if (!campanhaId) return false;
     const dev = deviceId || this.getDeviceId();
-    // local rápido
     try {
       if (localStorage.getItem('bonus_esp_done_' + campanhaId) === '1') return true;
     } catch (e) {}
-    const { data, error } = await this._db()
-      .from('bonus_especial_participacoes')
-      .select('id')
-      .eq('campanha_id', campanhaId)
-      .eq('device_id', dev)
-      .limit(1);
-    if (error) {
-      console.error('jaParticipouBonusEspecial', error);
-      // se tabela ainda não existe, usar só local
-      try { return localStorage.getItem('bonus_esp_done_' + campanhaId) === '1'; } catch (e) { return false; }
+    try {
+      if (!window.supabaseClient) return false;
+      const { data, error } = await this._db()
+        .from('bonus_especial_participacoes')
+        .select('id')
+        .eq('campanha_id', campanhaId)
+        .eq('device_id', dev)
+        .limit(1);
+      if (error) {
+        console.error('jaParticipouBonusEspecial', error);
+        try { return localStorage.getItem('bonus_esp_done_' + campanhaId) === '1'; } catch (e) { return false; }
+      }
+      return !!(data && data.length);
+    } catch (e) {
+      console.error('jaParticipouBonusEspecial exception', e);
+      try { return localStorage.getItem('bonus_esp_done_' + campanhaId) === '1'; } catch (e2) { return false; }
     }
-    return !!(data && data.length);
   },
 
   async gerarTokenBonusEspecial(clienteId) {

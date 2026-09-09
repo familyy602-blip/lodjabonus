@@ -58,6 +58,10 @@
       font-size: 13px; margin-bottom: 12px; text-align: left;
     }
     .erro-form.show { display: block; }
+    .btn-retry {
+      margin-top: 16px; padding: 12px 18px; border-radius: 10px; border: 1px solid #475569;
+      background: #334155; color: #e2e8f0; font-weight: 600; cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -66,12 +70,18 @@
   <script src="supabase-config.js"></script>
   <script src="storage.js"></script>
   <script>
-    initSupabase();
-
     function escapeHtml(s) {
       return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
     function normalizarTelefone(t) { return String(t || '').replace(/\D/g, ''); }
+
+    function ensureSupabase() {
+      if (window.supabaseClient) return true;
+      if (typeof initSupabase === 'function') {
+        initSupabase();
+      }
+      return !!window.supabaseClient;
+    }
 
     function irParaRoletaEspecial(cliente, campanhaId) {
       try {
@@ -123,6 +133,10 @@
         if (!telefone || telefone.length < 8) {
           erroEl.textContent = 'Introduza um contacto válido (mín. 8 dígitos).'; erroEl.classList.add('show'); return;
         }
+        if (!ensureSupabase()) {
+          erroEl.textContent = 'Ligação ao servidor não pronta. Recarregue a página.';
+          erroEl.classList.add('show'); return;
+        }
         btn.disabled = true;
         btn.textContent = 'A registar...';
         try {
@@ -140,7 +154,7 @@
           irParaRoletaEspecial(cliente, campanhaId);
         } catch (err) {
           console.error(err);
-          erroEl.textContent = 'Erro de ligação. Tente novamente.';
+          erroEl.textContent = 'Erro ao registar: ' + (err.message || err);
           erroEl.classList.add('show');
           btn.disabled = false;
           btn.textContent = 'Continuar para a Roleta';
@@ -148,32 +162,62 @@
       });
     }
 
-    (async () => {
+    async function iniciar() {
       const box = document.getElementById('box');
+      box.innerHTML = '<p class="off">A carregar...</p>';
+
+      if (typeof Storage === 'undefined' || typeof initSupabase !== 'function') {
+        box.innerHTML = `
+          <p class="off">Falha ao carregar os scripts do sistema.</p>
+          <button class="btn-retry" type="button" onclick="location.reload()">Tentar de novo</button>
+        `;
+        return;
+      }
+
+      if (!ensureSupabase()) {
+        // espera curta pela CDN
+        await new Promise(r => setTimeout(r, 400));
+        if (!ensureSupabase()) {
+          box.innerHTML = `
+            <p class="off">Não foi possível ligar ao servidor (Supabase).<br>Verifique a internet.</p>
+            <button class="btn-retry" type="button" onclick="location.reload()">Tentar de novo</button>
+          `;
+          return;
+        }
+      }
+
       try {
         const cfg = await Storage.getConfig();
-        const be = cfg.bonusEspecial || {};
+        const be = (cfg && cfg.bonusEspecial) ? cfg.bonusEspecial : {};
+
         if (!be.activo || !be.nome) {
           box.innerHTML = `
             <div class="badge" style="background:#475569">Indisponível</div>
             <h1>Bónus especial</h1>
-            <p class="off">Neste momento não há bónus especial activo.<br>Volte a verificar em breve ou pergunte na loja.</p>
+            <p class="off">Neste momento não há bónus especial activo.<br>Peça na loja para activarem a campanha em <strong>Configurações</strong>.</p>
           `;
           return;
         }
+
         let campanhaId = be.campanhaId;
         if (!campanhaId) {
-          // gerar e gravar se faltar
           campanhaId = 'camp_' + Date.now().toString(36);
           be.campanhaId = campanhaId;
           cfg.bonusEspecial = be;
-          try { await Storage.saveConfig(cfg); } catch (e) {}
+          try { await Storage.saveConfig(cfg); } catch (e) { console.warn('save campanhaId', e); }
         }
 
-        const ja = await Storage.jaParticipouBonusEspecial(campanhaId);
+        let ja = false;
+        try {
+          if (typeof Storage.jaParticipouBonusEspecial === 'function') {
+            ja = await Storage.jaParticipouBonusEspecial(campanhaId);
+          }
+        } catch (e) {
+          console.warn('check participacao', e);
+          try { ja = localStorage.getItem('bonus_esp_done_' + campanhaId) === '1'; } catch (e2) { ja = false; }
+        }
         if (ja) { mostrarBloqueado(); return; }
 
-        // Sessão já registada nesta campanha → roleta directa
         try {
           const raw = sessionStorage.getItem('bonus_especial_sessao');
           if (raw) {
@@ -188,9 +232,19 @@
         mostrarFormulario(be, campanhaId);
       } catch (e) {
         console.error(e);
-        box.innerHTML = `<p class="off">Não foi possível carregar. Verifique a ligação.</p>`;
+        box.innerHTML = `
+          <p class="off">Não foi possível carregar.<br><span style="font-size:12px;color:#64748b">${escapeHtml(e.message || String(e))}</span></p>
+          <button class="btn-retry" type="button" onclick="location.reload()">Tentar de novo</button>
+        `;
       }
-    })();
+    }
+
+    // arranque
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', iniciar);
+    } else {
+      iniciar();
+    }
   </script>
 </body>
 </html>
