@@ -634,6 +634,30 @@ const Storage = {
     };
   },
 
+
+  /** Sorteio de teste (admin): não bloqueia dispositivo nem grava participação real */
+  async realizarSorteioBonusEspecialTeste(campanhaId) {
+    const premio = await this.sortearPremio();
+    if (!premio) return { erro: 'Nenhum prémio configurado. Active prémios no painel.' };
+    const codigo = 'TESTE-' + this.generatePrizeCode(premio.nome);
+    return {
+      sucesso: true,
+      sorteio: {
+        id: 'teste_' + Date.now(),
+        participanteId: null,
+        clienteNome: 'Admin (teste)',
+        clienteTelefone: '',
+        premioId: premio.id,
+        premioNome: premio.nome,
+        premioDescricao: premio.descricao,
+        codigo,
+        dataSorteio: new Date().toISOString(),
+        estado: 'teste'
+      },
+      premio
+    };
+  },
+
   /** Copia participante do bónus para a tabela clientes */
   async tornarClienteRegistado(participanteId) {
     const part = await this.getParticipanteBonusById(participanteId);

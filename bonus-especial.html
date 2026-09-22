@@ -99,7 +99,19 @@
         <div class="badge" style="background:#475569">Já participou</div>
         <h1>Bónus Especial</h1>
         <p class="off">${escapeHtml(msg || 'Este contacto ou dispositivo já realizou o Bónus Especial. Aguarde pelo anúncio de um novo Bónus.')}</p>
+        <div style="margin-top:24px;display:flex;flex-direction:column;gap:10px">
+          <a href="login.html" class="btn-confirmar" style="text-decoration:none;display:block;text-align:center">Ir para o menu principal</a>
+          <p class="hint" style="margin:0;font-size:12px;color:#64748b">Será pedida a palavra-passe de administrador para aceder ao sistema.</p>
+        </div>
       `;
+    }
+
+    function isAdminTeste() {
+      try {
+        var q = new URLSearchParams(location.search);
+        if (q.get('teste') === '1' && sessionStorage.getItem('admin_logged') === 'true') return true;
+      } catch (e) {}
+      return false;
     }
 
     function mostrarFormulario(be, campanhaId) {
@@ -186,12 +198,30 @@
           try { await Storage.saveConfig(cfg); } catch (e) {}
         }
 
+        // Admin a testar (?teste=1 + sessão admin): ir directo à roleta sem limites
+        if (isAdminTeste()) {
+          try {
+            sessionStorage.setItem('bonus_especial_sessao', JSON.stringify({
+              participanteId: null,
+              nome: 'Admin (teste)',
+              telefone: '',
+              campanhaId: campanhaId,
+              modoTeste: true,
+              ts: Date.now()
+            }));
+          } catch (e) {}
+          window.location.href = 'roleta.html?modo=especial&teste=1';
+          return;
+        }
+
         // Sessão com participante ainda válido
         try {
           const raw = sessionStorage.getItem('bonus_especial_sessao');
           if (raw) {
             const s = JSON.parse(raw);
-            if (s && s.participanteId && s.campanhaId === campanhaId) {
+            if (s && s.modoTeste) {
+              /* ignorar sessão de teste para público */
+            } else if (s && s.participanteId && s.campanhaId === campanhaId) {
               const part = await Storage.getParticipanteBonusById(s.participanteId);
               if (part && (part.estado === 'concluido' || part.premioNome)) {
                 mostrarBloqueado();

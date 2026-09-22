@@ -159,36 +159,67 @@
       mostrarFormularioAcesso();
     }
 
+    function isAdminTeste() {
+      try {
+        const q = new URLSearchParams(location.search);
+        return q.get('teste') === '1' && sessionStorage.getItem('admin_logged') === 'true';
+      } catch (e) { return false; }
+    }
+
+    function ecranJaParticipou(msg) {
+      app.innerHTML = `
+        <div class="roleta-header">
+          <div class="badge-loja">Bónus Especial</div>
+          <h1>Já participou</h1>
+          <p class="subtitulo">${msg || 'Este dispositivo ou contacto já realizou o Bónus Especial.<br>Aguarde pelo anúncio de um novo Bónus.'}</p>
+          <div style="margin-top:24px;display:flex;flex-direction:column;gap:12px;align-items:center">
+            <a href="login.html" class="btn-girar" style="text-decoration:none;max-width:320px;text-align:center;display:block">Ir para o menu principal</a>
+            <p style="font-size:13px;color:#94a3b8;max-width:320px">O menu principal pede a palavra-passe de administrador para aceder ao sistema.</p>
+          </div>
+        </div>`;
+    }
+
     async function initRoletaBonusEspecial() {
       try {
         const cfg = await Storage.getConfig();
         const be = cfg.bonusEspecial || {};
+        const adminTeste = isAdminTeste();
+
         if (!be.activo || !be.campanhaId) {
           app.innerHTML = `
             <div class="roleta-header">
               <div class="badge-loja">Bónus Especial</div>
               <h1>Indisponível</h1>
               <p class="subtitulo">Não há bónus especial activo de momento.</p>
-              <p style="margin-top:20px"><a href="bonus-especial.html" style="color:#a5b4fc">← Voltar</a></p>
+              <p style="margin-top:20px"><a href="login.html" style="color:#a5b4fc">Ir para o menu principal</a></p>
             </div>`;
           return;
         }
 
         const campanhaId = be.campanhaId;
+
+        // --- Modo teste admin: sem limite de dispositivo, roleta ilimitada ---
+        if (adminTeste) {
+          const participanteTeste = {
+            id: 'teste_admin',
+            nome: 'Admin (teste)',
+            telefone: '',
+            estado: 'registado',
+            campanhaId
+          };
+          renderRoletaBonusEspecial(participanteTeste, campanhaId, be, { modoTeste: true });
+          return;
+        }
+
         const ja = await Storage.jaParticipouBonusEspecial(campanhaId);
         if (ja) {
-          app.innerHTML = `
-            <div class="roleta-header">
-              <div class="badge-loja">Bónus Especial</div>
-              <h1>Já participou</h1>
-              <p class="subtitulo">Este dispositivo já participou no Bónus Especial.<br>Aguarde pelo anúncio de um novo Bónus.</p>
-            </div>`;
+          ecranJaParticipou();
           return;
         }
 
         let sessao = null;
         try { sessao = JSON.parse(sessionStorage.getItem('bonus_especial_sessao') || 'null'); } catch (e) {}
-        if (!sessao || !sessao.participanteId || sessao.campanhaId !== campanhaId) {
+        if (!sessao || !sessao.participanteId || sessao.campanhaId !== campanhaId || sessao.modoTeste) {
           window.location.href = 'bonus-especial.html';
           return;
         }
@@ -199,35 +230,36 @@
           return;
         }
         if (participante.estado === 'concluido' || participante.premioNome) {
-          app.innerHTML = `
-            <div class="roleta-header">
-              <div class="badge-loja">Bónus Especial</div>
-              <h1>Já participou</h1>
-              <p class="subtitulo">Este contacto já realizou o Bónus Especial.<br>Aguarde pelo anúncio de um novo Bónus.</p>
-            </div>`;
+          ecranJaParticipou('Este contacto já realizou o Bónus Especial.<br>Aguarde pelo anúncio de um novo Bónus.');
           return;
         }
 
-        renderRoletaBonusEspecial(participante, campanhaId, be);
+        renderRoletaBonusEspecial(participante, campanhaId, be, { modoTeste: false });
       } catch (e) {
         console.error(e);
-        app.innerHTML = `<div class="roleta-header"><h1>Erro</h1><p class="subtitulo">Não foi possível carregar a roleta.</p></div>`;
+        app.innerHTML = `<div class="roleta-header"><h1>Erro</h1><p class="subtitulo">Não foi possível carregar a roleta.</p>
+          <p style="margin-top:16px"><a href="login.html" style="color:#a5b4fc">Menu principal</a></p></div>`;
       }
     }
 
-    async function renderRoletaBonusEspecial(participante, campanhaId, be) {
+    async function renderRoletaBonusEspecial(participante, campanhaId, be, opts) {
+      opts = opts || {};
+      const modoTeste = !!opts.modoTeste;
       const premios = (await Storage.getPremios()).filter(p => p.activo);
       if (!premios.length) {
-        app.innerHTML = `<div class="roleta-header"><h1>Sem prémios</h1><p class="subtitulo">Contacte a loja.</p></div>`;
+        app.innerHTML = `<div class="roleta-header"><h1>Sem prémios</h1><p class="subtitulo">Configure prémios activos no painel admin.</p>
+          <p style="margin-top:16px"><a href="login.html" style="color:#a5b4fc">Menu principal</a></p></div>`;
         return;
       }
 
       app.innerHTML = `
         <div class="roleta-header">
-          <div class="badge-loja">🔥 Bónus Especial</div>
+          <div class="badge-loja">🔥 Bónus Especial${modoTeste ? ' · TESTE ADMIN' : ''}</div>
           <h1>${(be && be.nome) ? be.nome : 'Roleta Especial'}</h1>
           <p class="cliente-nome">${participante.nome || ''}</p>
-          <p class="subtitulo">Uma participação por contacto/dispositivo nesta campanha</p>
+          <p class="subtitulo">${modoTeste
+            ? 'Modo teste: pode girar quantas vezes quiser (não bloqueia o dispositivo)'
+            : 'Uma participação por contacto/dispositivo nesta campanha'}</p>
         </div>
         <div class="wheel-wrapper">
           <div class="wheel-pointer"></div>
@@ -236,39 +268,57 @@
         </div>
         <button class="btn-girar" id="btnGirar">GIRAR A ROLETA</button>
         <div id="resultadoArea"></div>
+        ${modoTeste ? '<p style="text-align:center;margin-top:12px"><a href="bonus-gestao.html" style="color:#a5b4fc">← Voltar à gestão do Bónus</a></p>' : ''}
       `;
 
       drawWheel(premios);
+
+      let aGirar = false;
       document.getElementById('btnGirar').addEventListener('click', async () => {
+        if (aGirar) return;
         const btn = document.getElementById('btnGirar');
+        aGirar = true;
         btn.disabled = true;
         btn.textContent = 'A girar...';
 
-        const resultado = await Storage.realizarSorteioBonusEspecial(participante.id, campanhaId);
+        let resultado;
+        if (modoTeste) {
+          resultado = await Storage.realizarSorteioBonusEspecialTeste(campanhaId);
+        } else {
+          resultado = await Storage.realizarSorteioBonusEspecial(participante.id, campanhaId);
+        }
+
         if (resultado.erro) {
           alert(resultado.erro);
+          aGirar = false;
           btn.disabled = false;
           btn.textContent = 'GIRAR A ROLETA';
-          if (String(resultado.erro).indexOf('já participou') >= 0) {
-            setTimeout(() => location.reload(), 800);
+          if (!modoTeste && String(resultado.erro).indexOf('já participou') >= 0) {
+            setTimeout(() => ecranJaParticipou(resultado.erro), 400);
           }
           return;
         }
 
         const { sorteio, premio } = resultado;
-        const total = premios.reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0);
+        const total = premios.reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0) || 1;
         let acumulado = 0;
         let anguloAlvo = 0;
         const idx = premios.findIndex(p => p.id === premio.id);
         for (let i = 0; i < premios.length; i++) {
           const slice = ((parseFloat(premios[i].probabilidade) || 0) / total) * 360;
-          if (i === idx) { anguloAlvo = acumulado + slice / 2; break; }
+          if (i === (idx >= 0 ? idx : 0)) { anguloAlvo = acumulado + slice / 2; break; }
           acumulado += slice;
         }
         const voltas = 5 + Math.random() * 2;
+        // Ponteiro no topo: rodamos a roleta para o prémio ficar sob o ponteiro
         const rotacaoFinal = (voltas * 360) + (360 - anguloAlvo);
         const wheel = document.getElementById('wheel');
         wheel.classList.add('spinning');
+        // reset then force reflow for consecutive spins (admin test)
+        wheel.style.transition = 'none';
+        wheel.style.transform = 'rotate(0deg)';
+        void wheel.offsetWidth;
+        wheel.style.transition = 'transform 5s cubic-bezier(0.12, 0.8, 0.15, 1)';
         wheel.style.transform = `rotate(${rotacaoFinal}deg)`;
 
         let ticks = 0;
@@ -286,18 +336,23 @@
               <p class="premio-nome">${(premio.nome || '').replace(/</g,'&lt;')}</p>
               <p style="color:#94a3b8;font-size:14px">${(premio.descricao || '').replace(/</g,'&lt;')}</p>
               <p style="margin-top:12px;font-weight:700;color:#fbbf24">Código: ${sorteio.codigo || ''}</p>
-              <p style="margin-top:8px;font-size:13px;color:#94a3b8">Apresente este código na loja para receber o prémio.</p>
+              <p style="margin-top:8px;font-size:13px;color:#94a3b8">${modoTeste
+                ? 'Modo teste — este resultado não bloqueia participantes reais.'
+                : 'Apresente este código na loja para receber o prémio.'}</p>
             </div>`;
           if (typeof lancarConfetti === 'function') lancarConfetti();
-          btn.textContent = 'Participação concluída';
+          if (modoTeste) {
+            aGirar = false;
+            btn.disabled = false;
+            btn.textContent = 'GIRAR NOVAMENTE (teste)';
+          } else {
+            btn.textContent = 'Participação concluída';
+          }
         }, 5200);
       });
     }
 
 
-    // -------------------------------------------------------
-    // FORMULÁRIO DE ACESSO (link geral para o grupo)
-    // -------------------------------------------------------
     function mostrarFormularioAcesso() {
       app.innerHTML = `
         <div class="roleta-header">
@@ -476,43 +531,39 @@
 
     function drawWheel(premios) {
       const wheel = document.getElementById('wheel');
-      if (!premios.length) return;
+      if (!wheel || !premios.length) return;
 
       const total = premios.reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0) || 1;
       let current = 0;
-      let gradientParts = [];
+      const gradientParts = [];
 
       premios.forEach((p, i) => {
         const pct = ((parseFloat(p.probabilidade) || 0) / total) * 100;
-        const cor = p.cor && p.cor !== '#6366f1' ? p.cor : CORES_VIVAS[i % CORES_VIVAS.length];
-        const start = current;
-        const end = current + pct;
-        gradientParts.push(`${cor} ${start}% ${end}%`);
-        current = end;
+        const cor = (p.cor && p.cor !== '#6366f1') ? p.cor : CORES_VIVAS[i % CORES_VIVAS.length];
+        gradientParts.push(`${cor} ${current}% ${current + pct}%`);
+        current += pct;
       });
 
       wheel.style.background = `conic-gradient(from -90deg, ${gradientParts.join(', ')})`;
 
-      // Etiquetas com o nome do bónus em cada fatia
-      let labels = document.getElementById('wheelLabels');
+      // Etiquetas DENTRO da roleta — giram junto com as fatias/prémios
+      let labels = wheel.querySelector('.wheel-labels');
       if (!labels) {
         labels = document.createElement('div');
-        labels.id = 'wheelLabels';
         labels.className = 'wheel-labels';
-        wheel.parentElement.appendChild(labels);
+        wheel.appendChild(labels);
       }
       labels.innerHTML = '';
       current = 0;
-      premios.forEach((p, i) => {
+      premios.forEach((p) => {
         const pct = ((parseFloat(p.probabilidade) || 0) / total) * 100;
         const mid = current + pct / 2;
-        const angle = (mid / 100) * 360 - 90; // alinhado com conic-gradient from -90deg
-        const rad = angle * Math.PI / 180;
+        const angle = (mid / 100) * 360 - 90;
         const label = document.createElement('div');
         label.className = 'wheel-label';
-        const short = (p.nome || '').length > 18 ? (p.nome || '').slice(0, 16) + '…' : (p.nome || '');
+        const short = (p.nome || '').length > 16 ? (p.nome || '').slice(0, 14) + '…' : (p.nome || '');
         label.textContent = short;
-        label.style.transform = `rotate(${angle + 90}deg) translateY(-108px) rotate(${-(angle + 90)}deg)`;
+        label.style.transform = `rotate(${angle + 90}deg) translateY(-105px) rotate(${-(angle + 90)}deg)`;
         labels.appendChild(label);
         current += pct;
       });

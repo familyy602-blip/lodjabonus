@@ -392,3 +392,29 @@
     height: 260px;
   }
 }
+
+
+/* Labels dentro da roleta — rod entram com as fatias */
+.wheel {
+  position: relative;
+  overflow: hidden;
+}
+.wheel .wheel-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.wheel .wheel-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 90px;
+  margin-left: -45px;
+  margin-top: -10px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,.55);
+  line-height: 1.15;
+}
