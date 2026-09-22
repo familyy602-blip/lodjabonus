@@ -300,26 +300,7 @@
         }
 
         const { sorteio, premio } = resultado;
-        const total = premios.reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0) || 1;
-        let acumulado = 0;
-        let anguloAlvo = 0;
-        const idx = premios.findIndex(p => p.id === premio.id);
-        for (let i = 0; i < premios.length; i++) {
-          const slice = ((parseFloat(premios[i].probabilidade) || 0) / total) * 360;
-          if (i === (idx >= 0 ? idx : 0)) { anguloAlvo = acumulado + slice / 2; break; }
-          acumulado += slice;
-        }
-        const voltas = 5 + Math.random() * 2;
-        // Ponteiro no topo: rodamos a roleta para o prémio ficar sob o ponteiro
-        const rotacaoFinal = (voltas * 360) + (360 - anguloAlvo);
-        const wheel = document.getElementById('wheel');
-        wheel.classList.add('spinning');
-        // reset then force reflow for consecutive spins (admin test)
-        wheel.style.transition = 'none';
-        wheel.style.transform = 'rotate(0deg)';
-        void wheel.offsetWidth;
-        wheel.style.transition = 'transform 5s cubic-bezier(0.12, 0.8, 0.15, 1)';
-        wheel.style.transform = `rotate(${rotacaoFinal}deg)`;
+        const dur = animarRoletaParaPremio(premios, premio);
 
         let ticks = 0;
         const tickInterval = setInterval(() => {
@@ -348,7 +329,7 @@
           } else {
             btn.textContent = 'Participação concluída';
           }
-        }, 5200);
+        }, dur);
       });
     }
 
@@ -529,24 +510,87 @@
     // Cores vivas por defeito (se o prémio não tiver cor)
     const CORES_VIVAS = ['#FF1744', '#FF9100', '#FFD600', '#00E676', '#00B0FF', '#D500F9', '#FF4081', '#651FFF'];
 
+    /**
+     * Layout único da roleta (mesma lógica do desenho e do giro).
+     * Ângulos em graus, 0° = topo (ponteiro), sentido HORÁRIO (igual ao conic-gradient).
+     */
+    function layoutRoleta(premios) {
+      const n = premios.length;
+      const weights = premios.map(p => {
+        const w = parseFloat(p.probabilidade);
+        return (isFinite(w) && w > 0) ? w : 0;
+      });
+      let sum = weights.reduce((a, b) => a + b, 0);
+      if (sum <= 0) {
+        return premios.map((p, i) => {
+          const startDeg = (i / n) * 360;
+          const endDeg = ((i + 1) / n) * 360;
+          return { premio: p, index: i, startDeg, endDeg, midDeg: (startDeg + endDeg) / 2 };
+        });
+      }
+      let acc = 0;
+      return premios.map((p, i) => {
+        const startDeg = (acc / sum) * 360;
+        acc += weights[i];
+        const endDeg = (acc / sum) * 360;
+        return { premio: p, index: i, startDeg, endDeg, midDeg: (startDeg + endDeg) / 2 };
+      });
+    }
+
+    function indicePremioNaRoleta(premios, premio) {
+      if (!premio || !premios || !premios.length) return 0;
+      let idx = premios.findIndex(p => String(p.id) === String(premio.id));
+      if (idx >= 0) return idx;
+      idx = premios.findIndex(p => (p.nome || '') === (premio.nome || ''));
+      return idx >= 0 ? idx : 0;
+    }
+
+    /**
+     * Rotação CSS (horária) para o prémio vencedor ficar sob o ponteiro no TOPO.
+     * Ponto a midDeg no disco, após rotate(R): posição ecrã = midDeg + R.
+     * Queremos midDeg + R ≡ 0 (mod 360) ⇒ R ≡ -midDeg ≡ 360 - midDeg.
+     */
+    function calcularRotacaoFinal(premios, premio) {
+      const layout = layoutRoleta(premios);
+      const idx = indicePremioNaRoleta(premios, premio);
+      const seg = layout[idx];
+      // Pousa dentro da fatia vencedora (não só no centro exacto)
+      const span = Math.max(seg.endDeg - seg.startDeg, 0.01);
+      const landDeg = seg.startDeg + span * (0.2 + Math.random() * 0.6);
+      const voltas = 6 + Math.floor(Math.random() * 3); // 6–8 voltas inteiras
+      const ajuste = (360 - (landDeg % 360)) % 360;
+      return voltas * 360 + ajuste;
+    }
+
+    function animarRoletaParaPremio(premios, premio) {
+      const wheel = document.getElementById('wheel');
+      if (!wheel) return 5200;
+      const rotacaoFinal = calcularRotacaoFinal(premios, premio);
+      wheel.classList.add('spinning');
+      wheel.style.transition = 'none';
+      wheel.style.transform = 'rotate(0deg)';
+      void wheel.offsetWidth;
+      wheel.style.transition = 'transform 5s cubic-bezier(0.12, 0.75, 0.12, 1)';
+      wheel.style.transform = 'rotate(' + rotacaoFinal + 'deg)';
+      return 5200;
+    }
+
     function drawWheel(premios) {
       const wheel = document.getElementById('wheel');
       if (!wheel || !premios.length) return;
 
-      const total = premios.reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0) || 1;
-      let current = 0;
-      const gradientParts = [];
-
-      premios.forEach((p, i) => {
-        const pct = ((parseFloat(p.probabilidade) || 0) / total) * 100;
+      const layout = layoutRoleta(premios);
+      const gradientParts = layout.map((seg, i) => {
+        const p = seg.premio;
         const cor = (p.cor && p.cor !== '#6366f1') ? p.cor : CORES_VIVAS[i % CORES_VIVAS.length];
-        gradientParts.push(`${cor} ${current}% ${current + pct}%`);
-        current += pct;
+        // conic-gradient from -90deg: 0% no topo, horário — igual aos graus do layout
+        const startPct = (seg.startDeg / 360) * 100;
+        const endPct = (seg.endDeg / 360) * 100;
+        return cor + ' ' + startPct + '% ' + endPct + '%';
       });
 
-      wheel.style.background = `conic-gradient(from -90deg, ${gradientParts.join(', ')})`;
+      wheel.style.background = 'conic-gradient(from -90deg, ' + gradientParts.join(', ') + ')';
 
-      // Etiquetas DENTRO da roleta — giram junto com as fatias/prémios
       let labels = wheel.querySelector('.wheel-labels');
       if (!labels) {
         labels = document.createElement('div');
@@ -554,18 +598,16 @@
         wheel.appendChild(labels);
       }
       labels.innerHTML = '';
-      current = 0;
-      premios.forEach((p) => {
-        const pct = ((parseFloat(p.probabilidade) || 0) / total) * 100;
-        const mid = current + pct / 2;
-        const angle = (mid / 100) * 360 - 90;
+      layout.forEach((seg) => {
+        const p = seg.premio;
+        const mid = seg.midDeg; // 0 = topo, horário
         const label = document.createElement('div');
         label.className = 'wheel-label';
         const short = (p.nome || '').length > 16 ? (p.nome || '').slice(0, 14) + '…' : (p.nome || '');
         label.textContent = short;
-        label.style.transform = `rotate(${angle + 90}deg) translateY(-105px) rotate(${-(angle + 90)}deg)`;
+        // Rodar a etiqueta para o meio da fatia (e manter texto legível)
+        label.style.transform = 'rotate(' + mid + 'deg) translateY(-105px) rotate(' + (-mid) + 'deg)';
         labels.appendChild(label);
-        current += pct;
       });
     }
 
@@ -643,29 +685,8 @@
       }
 
       const { sorteio, premio } = resultado;
+      const dur = animarRoletaParaPremio(premios, premio);
 
-      const total = premios.reduce((s, p) => s + (parseFloat(p.probabilidade) || 0), 0);
-      let acumulado = 0;
-      let anguloAlvo = 0;
-      const idx = premios.findIndex(p => p.id === premio.id);
-
-      for (let i = 0; i < premios.length; i++) {
-        const slice = ((parseFloat(premios[i].probabilidade) || 0) / total) * 360;
-        if (i === idx) {
-          anguloAlvo = acumulado + slice / 2;
-          break;
-        }
-        acumulado += slice;
-      }
-
-      const voltas = 5 + Math.random() * 2;
-      const rotacaoFinal = (voltas * 360) + (360 - anguloAlvo);
-
-      const wheel = document.getElementById('wheel');
-      wheel.classList.add('spinning');
-      wheel.style.transform = `rotate(${rotacaoFinal}deg)`;
-
-      // Tiques durante o giro
       let ticks = 0;
       const tickInterval = setInterval(() => {
         playTick();
@@ -678,7 +699,7 @@
         playWinSound();
         mostrarResultado(sorteio, premio);
         lancarConfetti();
-      }, 5200);
+      }, dur);
     }
 
     function mostrarResultado(sorteio, premio) {
