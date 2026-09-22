@@ -523,3 +523,45 @@
   .wheel .wheel-label-classic .wl1 { font-size: 11px; max-width: 70px; }
   .wheel .wheel-label-classic .wl2 { font-size: 10px; }
 }
+
+
+/* Labels sempre legíveis e dentro da fatia */
+.wheel .wheel-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.wheel .wheel-label-classic {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 92px;
+  margin-left: -46px;
+  margin-top: -20px;
+  text-align: center;
+  font-weight: 900;
+  line-height: 1.12;
+  letter-spacing: 0;
+  text-shadow:
+    0 0 3px rgba(0,0,0,.45),
+    0 1px 2px rgba(0,0,0,.35),
+    0 0 1px rgba(255,255,255,.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+.wheel .wheel-label-classic .wl1 {
+  font-size: 12px;
+  font-weight: 900;
+  max-width: 90px;
+  word-break: break-word;
+}
+.wheel .wheel-label-classic .wl2 {
+  font-size: 11px;
+  font-weight: 800;
+  max-width: 90px;
+  word-break: break-word;
+}

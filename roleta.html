@@ -609,8 +609,8 @@
       const lista = premiosParaRoleta(premios);
       const layout = layoutRoleta(lista);
       const n = layout.length;
-      const gap = n > 12 ? 0.25 : 0.4; // % branco entre fatias
-
+      // separador branco fino entre fatias iguais
+      const gap = 0.35;
       const parts = [];
       layout.forEach((seg, i) => {
         const cor = corFatia(seg.premio, i);
@@ -618,17 +618,10 @@
         const a1 = (seg.endDeg / 360) * 100;
         const g0 = a0 + gap / 2;
         const g1 = a1 - gap / 2;
-        if (i === 0) {
-          parts.push('#f8fafc 0% ' + g0 + '%');
-        } else {
-          parts.push('#f8fafc ' + (a0 - gap / 2) + '% ' + g0 + '%');
-        }
+        parts.push('#ffffff ' + a0 + '% ' + g0 + '%');
         parts.push(cor + ' ' + g0 + '% ' + g1 + '%');
-        if (i === n - 1) {
-          parts.push('#f8fafc ' + g1 + '% 100%');
-        }
+        parts.push('#ffffff ' + g1 + '% ' + a1 + '%');
       });
-
       wheel.style.background = 'conic-gradient(from -90deg, ' + parts.join(', ') + ')';
 
       let labels = wheel.querySelector('.wheel-labels');
@@ -639,37 +632,43 @@
       }
       labels.innerHTML = '';
 
+      // Distância do centro (~38% do raio visual) — cabe dentro da roleta no telemóvel
+      const dist = 88;
+
       layout.forEach((seg, i) => {
         const p = seg.premio;
         const mid = seg.midDeg;
         const cor = corFatia(p, i);
-        const titulo = p._tituloRoleta || p.nome || ('Prémio ' + (i + 1));
-        // Texto grande no estilo roleta clássica (inclinado com a fatia)
+        let titulo = String(p._tituloRoleta || p.nome || '').trim();
+        if (!titulo) titulo = 'Prémio ' + (i + 1);
+
+        // Texto curto e claro na fatia (máx. 2 linhas)
+        const palavras = titulo.split(/\s+/);
+        let t1 = '', t2 = '';
+        if (titulo.length <= 14) {
+          t1 = titulo;
+        } else if (palavras.length >= 2) {
+          // partir ao meio por palavras
+          const midW = Math.ceil(palavras.length / 2);
+          t1 = palavras.slice(0, midW).join(' ');
+          t2 = palavras.slice(midW).join(' ');
+          if (t1.length > 16) t1 = t1.slice(0, 15) + '…';
+          if (t2.length > 16) t2 = t2.slice(0, 15) + '…';
+        } else {
+          t1 = titulo.slice(0, 12) + '…';
+        }
+
         const label = document.createElement('div');
         label.className = 'wheel-label wheel-label-classic';
         label.style.color = contrasteTexto(cor);
-        // Quebra em 2 linhas se for longo (ex: "Pega 1 leva 2")
-        let t1 = titulo;
-        let t2 = '';
-        if (titulo.length > 12) {
-          const sp = titulo.lastIndexOf(' ', 12);
-          if (sp > 4) {
-            t1 = titulo.slice(0, sp);
-            t2 = titulo.slice(sp + 1);
-          } else {
-            t1 = titulo.slice(0, 11);
-            t2 = titulo.slice(11);
-          }
-        }
-        label.innerHTML = '<span class="wl1">' + t1.replace(/</g,'&lt;') + '</span>' +
-          (t2 ? '<span class="wl2">' + t2.replace(/</g,'&lt;') + '</span>' : '');
+        label.innerHTML =
+          '<span class="wl1">' + t1.replace(/</g, '&lt;') + '</span>' +
+          (t2 ? '<span class="wl2">' + t2.replace(/</g, '&lt;') + '</span>' : '');
 
-        // Estilo exemplo: texto segue a fatia (sem "des-rodar" horizontal)
-        // Virar 180° na metade inferior para ler de pé
-        const flip = (mid > 90 && mid < 270);
-        const rot = flip ? (mid + 180) : mid;
-        const dist = n <= 6 ? 95 : (n <= 10 ? 102 : 108);
-        label.style.transform = 'rotate(' + rot + 'deg) translateY(-' + dist + 'px)';
+        // CRÍTICO: rodar para a fatia, avançar ao raio, des-rodar → texto SEMPRE direito e na fatia certa
+        // (o bug anterior com mid+180 enviava os textos do fundo para o topo)
+        label.style.transform =
+          'rotate(' + mid + 'deg) translateY(-' + dist + 'px) rotate(' + (-mid) + 'deg)';
         labels.appendChild(label);
       });
     }
