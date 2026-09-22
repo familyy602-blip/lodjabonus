@@ -418,3 +418,66 @@
   text-shadow: 0 1px 3px rgba(0,0,0,.55);
   line-height: 1.15;
 }
+
+
+/* Etiquetas das fatias — legíveis em amarelo, vermelho, etc. */
+.wheel .wheel-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.wheel .wheel-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100px;
+  margin-left: -50px;
+  margin-top: -18px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  text-shadow:
+    0 0 4px rgba(0,0,0,.35),
+    0 1px 2px rgba(0,0,0,.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.wheel .wheel-label .wl1 {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  max-width: 98px;
+  word-break: break-word;
+}
+.wheel .wheel-label .wl2 {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  opacity: 0.95;
+  max-width: 98px;
+  word-break: break-word;
+}
+.wheel .wheel-label-sm {
+  width: 78px;
+  margin-left: -39px;
+  font-size: 9px;
+}
+.wheel .wheel-label-sm .wl1 { font-size: 9px; max-width: 76px; }
+.wheel .wheel-label-sm .wl2 { font-size: 8px; max-width: 76px; }
+.wheel .wheel-label-lg {
+  width: 118px;
+  margin-left: -59px;
+}
+.wheel .wheel-label-lg .wl1 { font-size: 12px; max-width: 116px; }
+.wheel .wheel-label-lg .wl2 { font-size: 10px; max-width: 116px; }
+
+@media (max-width: 480px) {
+  .wheel .wheel-label { width: 86px; margin-left: -43px; }
+  .wheel .wheel-label .wl1 { font-size: 10px; max-width: 84px; }
+  .wheel .wheel-label .wl2 { font-size: 8px; }
+}

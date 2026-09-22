@@ -575,19 +575,74 @@
       return 5200;
     }
 
+    function corFatia(p, i) {
+      if (p.cor && /^#?[0-9A-Fa-f]{3,8}$/.test(String(p.cor).replace('#',''))) {
+        return p.cor.charAt(0) === '#' ? p.cor : ('#' + p.cor);
+      }
+      return CORES_VIVAS[i % CORES_VIVAS.length];
+    }
+
+    function contrasteTexto(hex) {
+      try {
+        let c = String(hex || '#6366f1').replace('#', '');
+        if (c.length === 3) c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
+        const r = parseInt(c.slice(0, 2), 16) || 0;
+        const g = parseInt(c.slice(2, 4), 16) || 0;
+        const b = parseInt(c.slice(4, 6), 16) || 0;
+        const L = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return L > 0.55 ? '#0f172a' : '#ffffff';
+      } catch (e) {
+        return '#ffffff';
+      }
+    }
+
+    /** Texto legível na fatia: nome + descrição curta se necessário */
+    function textoFatia(p) {
+      let nome = String(p.nome || '').trim();
+      let desc = String(p.descricao || '').trim();
+      const vazio = !nome || /^premio$/i.test(nome) || nome === '-' || nome === '—';
+      if (vazio) {
+        nome = desc || 'Oferta especial';
+        desc = '';
+      }
+      // Linha principal (oferta)
+      let linha1 = nome;
+      if (linha1.length > 22) linha1 = linha1.slice(0, 20) + '…';
+      // Segunda linha opcional (detalhe)
+      let linha2 = '';
+      if (desc && desc.toLowerCase() !== nome.toLowerCase()) {
+        linha2 = desc.length > 24 ? desc.slice(0, 22) + '…' : desc;
+      }
+      return { linha1, linha2 };
+    }
+
     function drawWheel(premios) {
       const wheel = document.getElementById('wheel');
       if (!wheel || !premios.length) return;
 
       const layout = layoutRoleta(premios);
-      const gradientParts = layout.map((seg, i) => {
-        const p = seg.premio;
-        const cor = (p.cor && p.cor !== '#6366f1') ? p.cor : CORES_VIVAS[i % CORES_VIVAS.length];
-        // conic-gradient from -90deg: 0% no topo, horário — igual aos graus do layout
-        const startPct = (seg.startDeg / 360) * 100;
-        const endPct = (seg.endDeg / 360) * 100;
-        return cor + ' ' + startPct + '% ' + endPct + '%';
+      // Separadores claros entre fatias (linha branca fina)
+      const gapPct = Math.min(0.45, 12 / Math.max(layout.length, 1)); // ~0.45% visual
+      const gradientParts = [];
+      layout.forEach((seg, i) => {
+        const cor = corFatia(seg.premio, i);
+        let startPct = (seg.startDeg / 360) * 100;
+        let endPct = (seg.endDeg / 360) * 100;
+        if (endPct - startPct > gapPct * 2) {
+          startPct += gapPct / 2;
+          endPct -= gapPct / 2;
+        }
+        // faixa de separação
+        if (i > 0) {
+          const prevEnd = (layout[i - 1].endDeg / 360) * 100;
+          gradientParts.push('#ffffff ' + (prevEnd - gapPct / 2) + '% ' + (startPct) + '%');
+        }
+        gradientParts.push(cor + ' ' + startPct + '% ' + endPct + '%');
       });
+      // fechar círculo com separador final
+      if (layout.length > 1) {
+        gradientParts.push('#ffffff ' + ((layout[layout.length - 1].endDeg / 360) * 100 - gapPct / 2) + '% 100%');
+      }
 
       wheel.style.background = 'conic-gradient(from -90deg, ' + gradientParts.join(', ') + ')';
 
@@ -598,15 +653,22 @@
         wheel.appendChild(labels);
       }
       labels.innerHTML = '';
-      layout.forEach((seg) => {
+      layout.forEach((seg, i) => {
         const p = seg.premio;
-        const mid = seg.midDeg; // 0 = topo, horário
+        const mid = seg.midDeg;
+        const span = Math.max(seg.endDeg - seg.startDeg, 1);
+        const cor = corFatia(p, i);
+        const txt = textoFatia(p);
         const label = document.createElement('div');
         label.className = 'wheel-label';
-        const short = (p.nome || '').length > 16 ? (p.nome || '').slice(0, 14) + '…' : (p.nome || '');
-        label.textContent = short;
-        // Rodar a etiqueta para o meio da fatia (e manter texto legível)
-        label.style.transform = 'rotate(' + mid + 'deg) translateY(-105px) rotate(' + (-mid) + 'deg)';
+        if (span < 28) label.classList.add('wheel-label-sm');
+        if (span >= 50) label.classList.add('wheel-label-lg');
+        label.style.color = contrasteTexto(cor);
+        label.innerHTML = '<span class="wl1">' + txt.linha1.replace(/</g, '&lt;') + '</span>' +
+          (txt.linha2 ? '<span class="wl2">' + txt.linha2.replace(/</g, '&lt;') + '</span>' : '');
+        // Distância radial: fatias maiores → texto um pouco mais para fora
+        const dist = span >= 45 ? 100 : (span >= 25 ? 105 : 112);
+        label.style.transform = 'rotate(' + mid + 'deg) translateY(-' + dist + 'px) rotate(' + (-mid) + 'deg)';
         labels.appendChild(label);
       });
     }
