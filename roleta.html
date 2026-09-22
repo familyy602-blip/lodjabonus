@@ -514,26 +514,30 @@
      * Layout único da roleta (mesma lógica do desenho e do giro).
      * Ângulos em graus, 0° = topo (ponteiro), sentido HORÁRIO (igual ao conic-gradient).
      */
+    /**
+     * Fatias IGUAIS: 1 prémio activo = 1 fatia (como roleta clássica do exemplo).
+     * A probabilidade continua a decidir QUEM ganha no sorteio; o desenho fica claro.
+     */
     function layoutRoleta(premios) {
-      const n = premios.length;
-      const weights = premios.map(p => {
-        const w = parseFloat(p.probabilidade);
-        return (isFinite(w) && w > 0) ? w : 0;
-      });
-      let sum = weights.reduce((a, b) => a + b, 0);
-      if (sum <= 0) {
-        return premios.map((p, i) => {
-          const startDeg = (i / n) * 360;
-          const endDeg = ((i + 1) / n) * 360;
-          return { premio: p, index: i, startDeg, endDeg, midDeg: (startDeg + endDeg) / 2 };
-        });
-      }
-      let acc = 0;
+      const n = premios.length || 1;
+      const slice = 360 / n;
       return premios.map((p, i) => {
-        const startDeg = (acc / sum) * 360;
-        acc += weights[i];
-        const endDeg = (acc / sum) * 360;
-        return { premio: p, index: i, startDeg, endDeg, midDeg: (startDeg + endDeg) / 2 };
+        const startDeg = i * slice;
+        const endDeg = (i + 1) * slice;
+        return { premio: p, index: i, startDeg, endDeg, midDeg: startDeg + slice / 2 };
+      });
+    }
+
+    /** Só prémios com texto legível na roleta */
+    function premiosParaRoleta(lista) {
+      return (lista || []).filter(p => p && p.activo !== false).map((p, i) => {
+        const nome = String(p.nome || '').trim();
+        const desc = String(p.descricao || '').trim();
+        let titulo = nome;
+        if (!titulo || /^premio$/i.test(titulo) || titulo === '-' || titulo === '—') {
+          titulo = desc || ('Prémio ' + (i + 1));
+        }
+        return Object.assign({}, p, { _tituloRoleta: titulo, _detalheRoleta: (desc && desc !== titulo) ? desc : '' });
       });
     }
 
@@ -542,6 +546,8 @@
       let idx = premios.findIndex(p => String(p.id) === String(premio.id));
       if (idx >= 0) return idx;
       idx = premios.findIndex(p => (p.nome || '') === (premio.nome || ''));
+      if (idx >= 0) return idx;
+      idx = premios.findIndex(p => (p._tituloRoleta || '') === (premio.nome || ''));
       return idx >= 0 ? idx : 0;
     }
 
@@ -551,8 +557,9 @@
      * Queremos midDeg + R ≡ 0 (mod 360) ⇒ R ≡ -midDeg ≡ 360 - midDeg.
      */
     function calcularRotacaoFinal(premios, premio) {
-      const layout = layoutRoleta(premios);
-      const idx = indicePremioNaRoleta(premios, premio);
+      const lista = premiosParaRoleta(premios);
+      const layout = layoutRoleta(lista);
+      const idx = indicePremioNaRoleta(lista, premio);
       const seg = layout[idx];
       // Pousa dentro da fatia vencedora (não só no centro exacto)
       const span = Math.max(seg.endDeg - seg.startDeg, 0.01);
@@ -576,75 +583,53 @@
     }
 
     function corFatia(p, i) {
-      if (p.cor && /^#?[0-9A-Fa-f]{3,8}$/.test(String(p.cor).replace('#',''))) {
-        return p.cor.charAt(0) === '#' ? p.cor : ('#' + p.cor);
+      const raw = p && p.cor ? String(p.cor).trim() : '';
+      if (raw && /^#?[0-9A-Fa-f]{3,8}$/.test(raw.replace('#', ''))) {
+        return raw.charAt(0) === '#' ? raw : ('#' + raw);
       }
       return CORES_VIVAS[i % CORES_VIVAS.length];
     }
 
     function contrasteTexto(hex) {
       try {
-        let c = String(hex || '#6366f1').replace('#', '');
+        let c = String(hex || '#333').replace('#', '');
         if (c.length === 3) c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
         const r = parseInt(c.slice(0, 2), 16) || 0;
         const g = parseInt(c.slice(2, 4), 16) || 0;
         const b = parseInt(c.slice(4, 6), 16) || 0;
         const L = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        return L > 0.55 ? '#0f172a' : '#ffffff';
-      } catch (e) {
-        return '#ffffff';
-      }
-    }
-
-    /** Texto legível na fatia: nome + descrição curta se necessário */
-    function textoFatia(p) {
-      let nome = String(p.nome || '').trim();
-      let desc = String(p.descricao || '').trim();
-      const vazio = !nome || /^premio$/i.test(nome) || nome === '-' || nome === '—';
-      if (vazio) {
-        nome = desc || 'Oferta especial';
-        desc = '';
-      }
-      // Linha principal (oferta)
-      let linha1 = nome;
-      if (linha1.length > 22) linha1 = linha1.slice(0, 20) + '…';
-      // Segunda linha opcional (detalhe)
-      let linha2 = '';
-      if (desc && desc.toLowerCase() !== nome.toLowerCase()) {
-        linha2 = desc.length > 24 ? desc.slice(0, 22) + '…' : desc;
-      }
-      return { linha1, linha2 };
+        return L > 0.55 ? '#111827' : '#ffffff';
+      } catch (e) { return '#ffffff'; }
     }
 
     function drawWheel(premios) {
       const wheel = document.getElementById('wheel');
       if (!wheel || !premios.length) return;
 
-      const layout = layoutRoleta(premios);
-      // Separadores claros entre fatias (linha branca fina)
-      const gapPct = Math.min(0.45, 12 / Math.max(layout.length, 1)); // ~0.45% visual
-      const gradientParts = [];
+      const lista = premiosParaRoleta(premios);
+      const layout = layoutRoleta(lista);
+      const n = layout.length;
+      const gap = n > 12 ? 0.25 : 0.4; // % branco entre fatias
+
+      const parts = [];
       layout.forEach((seg, i) => {
         const cor = corFatia(seg.premio, i);
-        let startPct = (seg.startDeg / 360) * 100;
-        let endPct = (seg.endDeg / 360) * 100;
-        if (endPct - startPct > gapPct * 2) {
-          startPct += gapPct / 2;
-          endPct -= gapPct / 2;
+        const a0 = (seg.startDeg / 360) * 100;
+        const a1 = (seg.endDeg / 360) * 100;
+        const g0 = a0 + gap / 2;
+        const g1 = a1 - gap / 2;
+        if (i === 0) {
+          parts.push('#f8fafc 0% ' + g0 + '%');
+        } else {
+          parts.push('#f8fafc ' + (a0 - gap / 2) + '% ' + g0 + '%');
         }
-        // faixa de separação
-        if (i > 0) {
-          const prevEnd = (layout[i - 1].endDeg / 360) * 100;
-          gradientParts.push('#ffffff ' + (prevEnd - gapPct / 2) + '% ' + (startPct) + '%');
+        parts.push(cor + ' ' + g0 + '% ' + g1 + '%');
+        if (i === n - 1) {
+          parts.push('#f8fafc ' + g1 + '% 100%');
         }
-        gradientParts.push(cor + ' ' + startPct + '% ' + endPct + '%');
       });
-      // fechar círculo com separador final
-      if (layout.length > 1) {
-        gradientParts.push('#ffffff ' + ((layout[layout.length - 1].endDeg / 360) * 100 - gapPct / 2) + '% 100%');
-      }
 
-      wheel.style.background = 'conic-gradient(from -90deg, ' + gradientParts.join(', ') + ')';
+      wheel.style.background = 'conic-gradient(from -90deg, ' + parts.join(', ') + ')';
 
       let labels = wheel.querySelector('.wheel-labels');
       if (!labels) {
@@ -653,22 +638,38 @@
         wheel.appendChild(labels);
       }
       labels.innerHTML = '';
+
       layout.forEach((seg, i) => {
         const p = seg.premio;
         const mid = seg.midDeg;
-        const span = Math.max(seg.endDeg - seg.startDeg, 1);
         const cor = corFatia(p, i);
-        const txt = textoFatia(p);
+        const titulo = p._tituloRoleta || p.nome || ('Prémio ' + (i + 1));
+        // Texto grande no estilo roleta clássica (inclinado com a fatia)
         const label = document.createElement('div');
-        label.className = 'wheel-label';
-        if (span < 28) label.classList.add('wheel-label-sm');
-        if (span >= 50) label.classList.add('wheel-label-lg');
+        label.className = 'wheel-label wheel-label-classic';
         label.style.color = contrasteTexto(cor);
-        label.innerHTML = '<span class="wl1">' + txt.linha1.replace(/</g, '&lt;') + '</span>' +
-          (txt.linha2 ? '<span class="wl2">' + txt.linha2.replace(/</g, '&lt;') + '</span>' : '');
-        // Distância radial: fatias maiores → texto um pouco mais para fora
-        const dist = span >= 45 ? 100 : (span >= 25 ? 105 : 112);
-        label.style.transform = 'rotate(' + mid + 'deg) translateY(-' + dist + 'px) rotate(' + (-mid) + 'deg)';
+        // Quebra em 2 linhas se for longo (ex: "Pega 1 leva 2")
+        let t1 = titulo;
+        let t2 = '';
+        if (titulo.length > 12) {
+          const sp = titulo.lastIndexOf(' ', 12);
+          if (sp > 4) {
+            t1 = titulo.slice(0, sp);
+            t2 = titulo.slice(sp + 1);
+          } else {
+            t1 = titulo.slice(0, 11);
+            t2 = titulo.slice(11);
+          }
+        }
+        label.innerHTML = '<span class="wl1">' + t1.replace(/</g,'&lt;') + '</span>' +
+          (t2 ? '<span class="wl2">' + t2.replace(/</g,'&lt;') + '</span>' : '');
+
+        // Estilo exemplo: texto segue a fatia (sem "des-rodar" horizontal)
+        // Virar 180° na metade inferior para ler de pé
+        const flip = (mid > 90 && mid < 270);
+        const rot = flip ? (mid + 180) : mid;
+        const dist = n <= 6 ? 95 : (n <= 10 ? 102 : 108);
+        label.style.transform = 'rotate(' + rot + 'deg) translateY(-' + dist + 'px)';
         labels.appendChild(label);
       });
     }

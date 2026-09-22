@@ -481,3 +481,45 @@
   .wheel .wheel-label .wl1 { font-size: 10px; max-width: 84px; }
   .wheel .wheel-label .wl2 { font-size: 8px; }
 }
+
+
+/* Roleta clássica — texto grande por fatia (estilo exemplo) */
+.wheel .wheel-label-classic {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 88px;
+  margin-left: -44px;
+  margin-top: -22px;
+  text-align: center;
+  font-weight: 900;
+  font-size: 13px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  text-shadow:
+    0 1px 0 rgba(0,0,0,.25),
+    0 0 6px rgba(0,0,0,.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.wheel .wheel-label-classic .wl1 {
+  font-size: 13px;
+  font-weight: 900;
+  max-width: 86px;
+  word-break: break-word;
+}
+.wheel .wheel-label-classic .wl2 {
+  font-size: 11px;
+  font-weight: 800;
+  max-width: 86px;
+  word-break: break-word;
+}
+@media (max-width: 480px) {
+  .wheel .wheel-label-classic { width: 72px; margin-left: -36px; }
+  .wheel .wheel-label-classic .wl1 { font-size: 11px; max-width: 70px; }
+  .wheel .wheel-label-classic .wl2 { font-size: 10px; }
+}
