@@ -431,209 +431,109 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   </style>
 
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>LODJA Store</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Produto — LODJA Store</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/loja.css">
-  <link rel="icon" href="logo-lodja.png">
 </head>
 <body>
+  <div class="page-voltar">
+    <a class="btn-voltar" href="index.html">← Voltar</a>
+  </div>
   <header class="site-header">
     <div class="container header-inner">
-      <a class="logo" href="index.html">
-        <img src="logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%;object-fit:cover" id="brandLogo" onerror="this.style.display='none'">
-        <span class="logo-mark" id="logoMark" style="display:none">L</span>
-        <span id="brandName">LODJA Store</span>
-      </a>
+      <a class="logo" href="index.html"><img src="logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%;object-fit:cover"> LODJA Store</a>
       <nav class="nav-links">
-        <a href="index.html" class="active">Início</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="solicitar.html">Solicitar</a>
-        <a href="pedidos.html">Meus pedidos</a>
-        <a href="admin/login.html">Admin</a>
-        <a class="icon-btn" href="carrinho.html" title="Carrinho">🛒<span class="badge-count" data-cart-count style="display:none">0</span></a>
+        <a href="index.html">Início</a>
+        <a class="icon-btn" href="carrinho.html">🛒<span class="badge-count" data-cart-count style="display:none">0</span></a>
       </nav>
     </div>
   </header>
-
-  <main class="container">
-    <section class="hero">
-      <h1>Moda com estilo.<br>A sua loja online.</h1>
-      <p>Explore o catálogo, escolha tamanhos e cores, peça em minutos e acompanhe a sua encomenda.</p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="catalogo.html">Ver produtos</a>
-        <a class="btn btn-outline" id="btnBonus" href="#" style="display:none">Bónus Especial</a>
-      </div>
-    </section>
-
-    <!-- Destaque: promoção real do LODJA v1 -->
-    <div class="bonus-destaque" id="bonusDestaque" style="display:none">
-      <div>
-        <strong id="bonusTitulo">Bónus Especial</strong>
-        <div style="opacity:.9;font-size:13px;margin-top:4px" id="bonusDesc"></div>
-      </div>
-      <a class="btn" id="bonusLink" href="https://familyy602-blip.github.io/lodjabonus/bonus-especial.html">Participar</a>
-    </div>
-
-    <div class="promo-banner" id="promoBanner" style="display:none">
-      <div>
-        <strong id="promoNome">Promoção</strong>
-        <div style="opacity:.8;font-size:13px" id="promoDesc"></div>
-      </div>
-      <div>
-        <div style="font-size:12px;opacity:.75;margin-bottom:4px">Termina em</div>
-        <div class="timer" id="promoTimer"></div>
-      </div>
-    </div>
-
-    <section class="section" id="destaques">
-      <div class="section-head">
-        <h2>Em destaque</h2>
-      </div>
-      <div class="grid-produtos" id="gridDestaque"></div>
-    </section>
-
-    <section class="section" id="tendencias">
-      <div class="section-head">
-        <h2>Tendências</h2>
-      </div>
-      <div class="grid-produtos" id="gridTendencia"></div>
-    </section>
-</main>
-
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <div><strong id="footerName">LODJA Store</strong></div>
-      <div>© <span id="year"></span></div>
-    </div>
-  </footer>
-
+  <main class="container" id="app"><p class="empty">A carregar…</p></main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
   <script src="js/cart.js"></script>
   <script src="js/loja-storage.js"></script>
-  <script src="js/lodja-bridge.js"></script>
   <script>
-    document.getElementById('year').textContent = new Date().getFullYear();
-    let todos = [], catActiva = '';
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+    let prod = null, tamanho = '', cor = '', qty = 1, imgIdx = 0;
 
-    function cardHTML(p) {
-      const preco = LojaDB.precoFinal(p);
-      const promo = p.preco_promocional != null && p.preco_promocional < p.preco;
-      return `<a class="card-prod" href="produto.html?id=${encodeURIComponent(p.id)}">
-        <div class="thumb">
-          ${promo ? '<span class="badge-promo">Promo</span>' : ''}
-          <img src="${LojaDB.imgPrincipal(p)}" alt="" loading="lazy">
-        </div>
-        <div class="card-body">
-          <h3>${(p.nome||'').replace(/</g,'&lt;')}</h3>
-          <div class="preco">
-            <span class="now">${LojaDB.formatMT(preco)}</span>
-            ${promo ? `<span class="old">${LojaDB.formatMT(p.preco)}</span>` : ''}
+    function toast(msg) {
+      const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+      document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
+    }
+
+    function render() {
+      if (!prod) { document.getElementById('app').innerHTML = '<p class="empty">Produto não encontrado</p>'; return; }
+      const imgs = (prod.imagens && prod.imagens.length) ? prod.imagens.slice().sort((a,b)=>a.ordem-b.ordem) : [{ url: LojaDB.imgPrincipal(prod) }];
+      const vars = prod.variacoes || [];
+      const tamanhos = [...new Set(vars.map(v => v.tamanho).filter(Boolean))];
+      const cores = [...new Set(vars.filter(v => !tamanho || v.tamanho === tamanho).map(v => v.cor).filter(Boolean))];
+      if (!tamanho && tamanhos[0]) tamanho = tamanhos[0];
+      if (!cor && cores[0]) cor = cores[0];
+      const stockVar = vars.find(v => v.tamanho === tamanho && v.cor === cor);
+      const stock = stockVar ? stockVar.stock : 0;
+      const preco = LojaDB.precoFinal(prod);
+      const promo = prod.preco_promocional != null && prod.preco_promocional < prod.preco;
+
+      document.getElementById('app').innerHTML = `
+        <div class="prod-layout">
+          <div class="gallery">
+            <div class="gallery-main"><img id="mainImg" src="${imgs[imgIdx]?.url || ''}" alt=""></div>
+            <div class="gallery-thumbs">
+              ${imgs.map((im,i) => `<button type="button" class="${i===imgIdx?'active':''}" data-i="${i}"><img src="${im.url}"></button>`).join('')}
+            </div>
           </div>
-        </div>
-      </a>`;
-    }
+          <div>
+            <p style="color:var(--muted);font-size:13px;margin-bottom:6px">${prod.codigo || ''}</p>
+            <h1 style="font-size:1.6rem;margin-bottom:10px">${(prod.nome||'').replace(/</g,'&lt;')}</h1>
+            <div class="preco" style="margin-bottom:14px">
+              <span class="now" style="font-size:1.4rem">${LojaDB.formatMT(preco)}</span>
+              ${promo ? `<span class="old">${LojaDB.formatMT(prod.preco)}</span>` : ''}
+            </div>
+            <p style="color:var(--muted);margin-bottom:18px">${(prod.descricao||'').replace(/</g,'&lt;')}</p>
+            ${tamanhos.length ? `<div><strong>Tamanho</strong><div class="opts" id="optsTam">
+              ${tamanhos.map(t => `<button type="button" class="opt ${t===tamanho?'selected':''}" data-t="${t}">${t}</button>`).join('')}
+            </div></div>` : ''}
+            ${cores.length ? `<div><strong>Cor</strong><div class="opts" id="optsCor">
+              ${cores.map(c => `<button type="button" class="opt ${c===cor?'selected':''}" data-c="${c}">${c}</button>`).join('')}
+            </div></div>` : ''}
+            <div class="qty-row">
+              <strong>Quantidade</strong>
+              <button type="button" id="qMinus">−</button>
+              <span id="qVal">${qty}</span>
+              <button type="button" id="qPlus">+</button>
+              <span style="color:var(--muted);font-size:13px">Stock: ${stock}</span>
+            </div>
+            <div class="actions-row">
+              <button class="btn btn-primary" id="btnCart" ${stock<=0?'disabled':''}>Adicionar ao carrinho</button>
+              <button class="btn btn-accent" id="btnNow" ${stock<=0?'disabled':''}>Solicitar agora</button>
+            </div>
+            <p style="margin-top:14px;font-size:12px;color:var(--muted)">Adicionar ao carrinho não gera peças no LODJA. A fidelização só ocorre após compra validada pela loja.</p>
+          </div>
+        </div>`;
 
-    function filtrar() {
-      const q = (document.getElementById('busca').value || '').toLowerCase();
-      let list = todos;
-      if (catActiva) list = list.filter(p => p.categoria_id === catActiva);
-      if (q) list = list.filter(p => (p.nome || '').toLowerCase().includes(q));
-      document.getElementById('gridCatalogo').innerHTML = list.map(cardHTML).join('') || '<p class="empty">Nenhum produto</p>';
-    }
-
-    function startTimer(fimIso) {
-      if (!fimIso) {
-        document.getElementById('promoTimer').innerHTML = '<span style="padding:8px 12px">Activo</span>';
-        return;
-      }
-      const tick = () => {
-        const ms = Math.max(0, new Date(fimIso).getTime() - Date.now());
-        if (ms <= 0) {
-          document.getElementById('promoBanner').style.display = 'none';
-          document.getElementById('bonusDestaque').style.display = 'none';
-          document.getElementById('btnBonus').style.display = 'none';
-          return;
-        }
-        const d = Math.floor(ms/86400000), h = Math.floor((ms%86400000)/3600000);
-        const m = Math.floor((ms%3600000)/60000), s = Math.floor((ms%60000)/1000);
-        document.getElementById('promoTimer').innerHTML =
-          `<span>${String(d).padStart(2,'0')}D</span><span>${String(h).padStart(2,'0')}H</span><span>${String(m).padStart(2,'0')}M</span><span>${String(s).padStart(2,'0')}S</span>`;
+      document.querySelectorAll('.gallery-thumbs button').forEach(b => b.onclick = () => { imgIdx = +b.dataset.i; render(); });
+      document.querySelectorAll('#optsTam .opt').forEach(b => b.onclick = () => { tamanho = b.dataset.t; cor = ''; render(); });
+      document.querySelectorAll('#optsCor .opt').forEach(b => b.onclick = () => { cor = b.dataset.c; render(); });
+      document.getElementById('qMinus').onclick = () => { qty = Math.max(1, qty-1); document.getElementById('qVal').textContent = qty; };
+      document.getElementById('qPlus').onclick = () => { qty = Math.min(stock||99, qty+1); document.getElementById('qVal').textContent = qty; };
+      document.getElementById('btnCart').onclick = () => {
+        Cart.add({ produtoId: prod.id, nome: prod.nome, imagem: LojaDB.imgPrincipal(prod), tamanho, cor, preco, quantidade: qty, variacaoId: stockVar?.id });
+        toast('Adicionado ao carrinho');
       };
-      tick();
-      setInterval(tick, 1000);
+      document.getElementById('btnNow').onclick = () => {
+        Cart.add({ produtoId: prod.id, nome: prod.nome, imagem: LojaDB.imgPrincipal(prod), tamanho, cor, preco, quantidade: qty, variacaoId: stockVar?.id });
+        location.href = 'checkout.html';
+      };
     }
 
     (async () => {
-      initSupabase();
-      await LojaDB.init();
-
-      try {
-        const settings = await LojaDB.getSettings();
-        if (settings.siteName) {
-          document.getElementById('brandName').textContent = settings.siteName;
-          document.getElementById('footerName').textContent = settings.siteName;
-          document.title = settings.siteName;
-        }
-        if (settings.logoUrl) document.getElementById('brandLogo').src = settings.logoUrl;
-      } catch (e) {}
-
-      // Promoção em destaque = Bónus Especial do LODJA v1
-      try {
-        const be = await LodjaBridge.getBonusEspecialLodja();
-        if (be && be.activo) {
-          const nome = be.nome || 'Bónus Especial';
-          const desc = be.descricao || 'Participe e ganhe prémios exclusivos';
-          const fim = be.dataFim || be.data_fim || null;
-          const link = 'https://familyy602-blip.github.io/lodjabonus/bonus-especial.html';
-
-          document.getElementById('btnBonus').style.display = '';
-          document.getElementById('btnBonus').href = link;
-          document.getElementById('btnBonus').textContent = nome;
-
-          document.getElementById('bonusDestaque').style.display = 'flex';
-          document.getElementById('bonusTitulo').textContent = '🎁 ' + nome;
-          document.getElementById('bonusDesc').textContent = desc;
-          document.getElementById('bonusLink').href = link;
-
-          document.getElementById('promoBanner').style.display = 'flex';
-          document.getElementById('promoNome').textContent = nome;
-          document.getElementById('promoDesc').textContent = desc;
-          startTimer(fim);
-        }
-      } catch (e) { console.warn(e); }
-
-      todos = await LojaDB.getProdutos();
-      document.getElementById('gridDestaque').innerHTML = todos.filter(p => p.destaque).slice(0, 6).map(cardHTML).join('') || '<p class="empty">—</p>';
-      document.getElementById('gridTendencia').innerHTML = todos.filter(p => p.tendencia).slice(0, 6).map(cardHTML).join('') || '<p class="empty">—</p>';
-
-      const cats = await LojaDB.getCategorias();
-      document.getElementById('chipsCats').innerHTML =
-        `<button type="button" class="chip active" data-id="">Todos</button>` +
-        cats.map(c => `<button type="button" class="chip" data-id="${c.id}">${c.nome}</button>`).join('');
-      document.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
-        document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-        ch.classList.add('active');
-        catActiva = ch.dataset.id;
-        filtrar();
-      }));
-      filtrar();
+      initSupabase(); await LojaDB.init();
+      prod = await LojaDB.getProduto(id);
+      render();
     })();
   </script>
-
-  <div id="js-missing-hint" style="display:none;max-width:640px;margin:16px auto;padding:14px 16px;background:#fef3c7;border:1px solid #f59e0b;border-radius:12px;color:#92400e;font-size:14px">
-    ⚠️ Os ficheiros JavaScript não carregaram (pasta <code>js/</code> em falta no GitHub).
-    Envie a pasta <strong>js</strong> e a pasta <strong>admin</strong> para a raiz do repositório <code>lodjastore</code>.
-  </div>
-  <script>
-    window.addEventListener('load', function () {
-      if (typeof LojaDB === 'undefined') {
-        var h = document.getElementById('js-missing-hint');
-        if (h) h.style.display = 'block';
-      }
-    });
-  </script>
-
 </body>
 </html>

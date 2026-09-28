@@ -431,209 +431,110 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   </style>
 
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>LODJA Store</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solicitar pedido — LODJA Store</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/loja.css">
-  <link rel="icon" href="logo-lodja.png">
 </head>
 <body>
+  <div class="page-voltar">
+    <a class="btn-voltar" href="index.html">← Voltar</a>
+  </div>
   <header class="site-header">
     <div class="container header-inner">
-      <a class="logo" href="index.html">
-        <img src="logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%;object-fit:cover" id="brandLogo" onerror="this.style.display='none'">
-        <span class="logo-mark" id="logoMark" style="display:none">L</span>
-        <span id="brandName">LODJA Store</span>
-      </a>
-      <nav class="nav-links">
-        <a href="index.html" class="active">Início</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="solicitar.html">Solicitar</a>
-        <a href="pedidos.html">Meus pedidos</a>
-        <a href="admin/login.html">Admin</a>
-        <a class="icon-btn" href="carrinho.html" title="Carrinho">🛒<span class="badge-count" data-cart-count style="display:none">0</span></a>
-      </nav>
+      <a class="logo" href="index.html"><img src="logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%"> LODJA Store</a>
     </div>
   </header>
-
-  <main class="container">
-    <section class="hero">
-      <h1>Moda com estilo.<br>A sua loja online.</h1>
-      <p>Explore o catálogo, escolha tamanhos e cores, peça em minutos e acompanhe a sua encomenda.</p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="catalogo.html">Ver produtos</a>
-        <a class="btn btn-outline" id="btnBonus" href="#" style="display:none">Bónus Especial</a>
+  <main class="container" style="margin:24px auto 48px;max-width:640px">
+    <h1 style="margin-bottom:8px">Solicitar pedido</h1>
+    <p style="color:var(--muted);margin-bottom:18px;font-size:14px">Preencha os dados. O pedido fica <strong>pendente</strong> até a loja confirmar. Só após conclusão entra no LODJA.</p>
+    <div class="summary" id="resumo" style="margin-bottom:18px"></div>
+    <form id="form" class="table-card" style="padding:18px">
+      <div class="form-group"><label>Nome completo *</label><input class="form-control" id="nome" required></div>
+      <div class="form-group"><label>Telefone / WhatsApp *</label><input class="form-control" id="tel" required inputmode="tel"></div>
+      <div class="form-group"><label>Email</label><input class="form-control" id="email" type="email"></div>
+      <div class="form-group"><label>Método de entrega *</label>
+        <select class="form-control" id="entrega" required>
+          <option value="levantamento">Levantamento na loja</option>
+          <option value="entrega">Entrega ao domicílio</option>
+        </select>
       </div>
-    </section>
-
-    <!-- Destaque: promoção real do LODJA v1 -->
-    <div class="bonus-destaque" id="bonusDestaque" style="display:none">
-      <div>
-        <strong id="bonusTitulo">Bónus Especial</strong>
-        <div style="opacity:.9;font-size:13px;margin-top:4px" id="bonusDesc"></div>
+      <div class="form-group"><label>Morada / ponto de referência</label><textarea class="form-control" id="morada" rows="2"></textarea></div>
+      <div class="form-group"><label>Pagamento *</label>
+        <select class="form-control" id="pagamento" required>
+          <option value="mpesa">M-Pesa</option>
+          <option value="emola">e-Mola</option>
+          <option value="transferencia">Transferência</option>
+          <option value="numerario">Numerário (na loja)</option>
+        </select>
       </div>
-      <a class="btn" id="bonusLink" href="https://familyy602-blip.github.io/lodjabonus/bonus-especial.html">Participar</a>
+      <div class="form-group"><label>Observações</label><textarea class="form-control" id="obs" rows="2"></textarea></div>
+      <button class="btn btn-primary btn-block" type="submit">Enviar solicitação</button>
+    </form>
+    <div id="ok" style="display:none" class="summary">
+      <h2 style="color:var(--success)">Pedido enviado!</h2>
+      <p id="okMsg"></p>
+      <a class="btn btn-outline" href="pedidos.html">Ver meus pedidos</a>
+      <a class="btn btn-primary" href="index.html">Voltar à loja</a>
     </div>
-
-    <div class="promo-banner" id="promoBanner" style="display:none">
-      <div>
-        <strong id="promoNome">Promoção</strong>
-        <div style="opacity:.8;font-size:13px" id="promoDesc"></div>
-      </div>
-      <div>
-        <div style="font-size:12px;opacity:.75;margin-bottom:4px">Termina em</div>
-        <div class="timer" id="promoTimer"></div>
-      </div>
-    </div>
-
-    <section class="section" id="destaques">
-      <div class="section-head">
-        <h2>Em destaque</h2>
-      </div>
-      <div class="grid-produtos" id="gridDestaque"></div>
-    </section>
-
-    <section class="section" id="tendencias">
-      <div class="section-head">
-        <h2>Tendências</h2>
-      </div>
-      <div class="grid-produtos" id="gridTendencia"></div>
-    </section>
-</main>
-
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <div><strong id="footerName">LODJA Store</strong></div>
-      <div>© <span id="year"></span></div>
-    </div>
-  </footer>
-
+  </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
   <script src="js/cart.js"></script>
   <script src="js/loja-storage.js"></script>
   <script src="js/lodja-bridge.js"></script>
   <script>
-    document.getElementById('year').textContent = new Date().getFullYear();
-    let todos = [], catActiva = '';
-
-    function cardHTML(p) {
-      const preco = LojaDB.precoFinal(p);
-      const promo = p.preco_promocional != null && p.preco_promocional < p.preco;
-      return `<a class="card-prod" href="produto.html?id=${encodeURIComponent(p.id)}">
-        <div class="thumb">
-          ${promo ? '<span class="badge-promo">Promo</span>' : ''}
-          <img src="${LojaDB.imgPrincipal(p)}" alt="" loading="lazy">
-        </div>
-        <div class="card-body">
-          <h3>${(p.nome||'').replace(/</g,'&lt;')}</h3>
-          <div class="preco">
-            <span class="now">${LojaDB.formatMT(preco)}</span>
-            ${promo ? `<span class="old">${LojaDB.formatMT(p.preco)}</span>` : ''}
-          </div>
-        </div>
-      </a>`;
-    }
-
-    function filtrar() {
-      const q = (document.getElementById('busca').value || '').toLowerCase();
-      let list = todos;
-      if (catActiva) list = list.filter(p => p.categoria_id === catActiva);
-      if (q) list = list.filter(p => (p.nome || '').toLowerCase().includes(q));
-      document.getElementById('gridCatalogo').innerHTML = list.map(cardHTML).join('') || '<p class="empty">Nenhum produto</p>';
-    }
-
-    function startTimer(fimIso) {
-      if (!fimIso) {
-        document.getElementById('promoTimer').innerHTML = '<span style="padding:8px 12px">Activo</span>';
-        return;
-      }
-      const tick = () => {
-        const ms = Math.max(0, new Date(fimIso).getTime() - Date.now());
-        if (ms <= 0) {
-          document.getElementById('promoBanner').style.display = 'none';
-          document.getElementById('bonusDestaque').style.display = 'none';
-          document.getElementById('btnBonus').style.display = 'none';
-          return;
-        }
-        const d = Math.floor(ms/86400000), h = Math.floor((ms%86400000)/3600000);
-        const m = Math.floor((ms%3600000)/60000), s = Math.floor((ms%60000)/1000);
-        document.getElementById('promoTimer').innerHTML =
-          `<span>${String(d).padStart(2,'0')}D</span><span>${String(h).padStart(2,'0')}H</span><span>${String(m).padStart(2,'0')}M</span><span>${String(s).padStart(2,'0')}S</span>`;
-      };
-      tick();
-      setInterval(tick, 1000);
-    }
-
     (async () => {
-      initSupabase();
-      await LojaDB.init();
+      initSupabase(); await LojaDB.init();
+      const items = Cart.get();
+      if (!items.length) { location.href = 'carrinho.html'; return; }
+      const promos = await LojaDB.getPromocoesActivas();
+      const calc = LojaDB.calcularDesconto(items, promos);
+      document.getElementById('resumo').innerHTML = `
+        <strong>${items.length} artigo(s)</strong> · ${items.reduce((s,i)=>s+i.quantidade,0)} peça(s)<br>
+        Total a pagar: <strong>${LojaDB.formatMT(calc.total)}</strong>
+        ${calc.desconto ? `<br><span style="color:var(--success)">Desconto: −${LojaDB.formatMT(calc.desconto)}</span>` : ''}`;
 
-      try {
-        const settings = await LojaDB.getSettings();
-        if (settings.siteName) {
-          document.getElementById('brandName').textContent = settings.siteName;
-          document.getElementById('footerName').textContent = settings.siteName;
-          document.title = settings.siteName;
+      document.getElementById('form').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        btn.disabled = true; btn.textContent = 'A enviar…';
+        try {
+          const pedido = await LojaDB.criarPedido({
+            nome: document.getElementById('nome').value.trim(),
+            telefone: document.getElementById('tel').value.trim(),
+            email: document.getElementById('email').value.trim(),
+            metodo_entrega: document.getElementById('entrega').value,
+            morada_entrega: document.getElementById('morada').value.trim(),
+            metodo_pagamento: document.getElementById('pagamento').value,
+            observacoes: document.getElementById('obs').value.trim(),
+            subtotal: calc.subtotal,
+            desconto: calc.desconto,
+            total: calc.total,
+            itens: items
+          });
+          Cart.clear();
+          try {
+            const settings = await LojaDB.getSettings();
+            window.location.href = LodjaBridge.whatsappPedidoUrl(pedido, settings);
+            return;
+          } catch (err) { console.warn(err); }
+          document.getElementById('form').style.display = 'none';
+          document.getElementById('resumo').style.display = 'none';
+          document.getElementById('ok').style.display = 'block';
+          document.getElementById('okMsg').innerHTML =
+            `Número do pedido: <strong>${pedido.numero_pedido}</strong><br>Estado: Pendente — a loja irá contactá-lo.`;
+          // WhatsApp hint (admin number configurable)
+          try {
+            const msg = encodeURIComponent(`Novo pedido ${pedido.numero_pedido}\nCliente: ${pedido.cliente_nome}\nTel: ${pedido.cliente_telefone}\nTotal: ${pedido.total} MT\nPeças: ${items.reduce((s,i)=>s+i.quantidade,0)}`);
+            console.log('WhatsApp template:', msg);
+          } catch (e) {}
+        } catch (err) {
+          alert('Erro: ' + (err.message || err));
+          btn.disabled = false; btn.textContent = 'Enviar solicitação';
         }
-        if (settings.logoUrl) document.getElementById('brandLogo').src = settings.logoUrl;
-      } catch (e) {}
-
-      // Promoção em destaque = Bónus Especial do LODJA v1
-      try {
-        const be = await LodjaBridge.getBonusEspecialLodja();
-        if (be && be.activo) {
-          const nome = be.nome || 'Bónus Especial';
-          const desc = be.descricao || 'Participe e ganhe prémios exclusivos';
-          const fim = be.dataFim || be.data_fim || null;
-          const link = 'https://familyy602-blip.github.io/lodjabonus/bonus-especial.html';
-
-          document.getElementById('btnBonus').style.display = '';
-          document.getElementById('btnBonus').href = link;
-          document.getElementById('btnBonus').textContent = nome;
-
-          document.getElementById('bonusDestaque').style.display = 'flex';
-          document.getElementById('bonusTitulo').textContent = '🎁 ' + nome;
-          document.getElementById('bonusDesc').textContent = desc;
-          document.getElementById('bonusLink').href = link;
-
-          document.getElementById('promoBanner').style.display = 'flex';
-          document.getElementById('promoNome').textContent = nome;
-          document.getElementById('promoDesc').textContent = desc;
-          startTimer(fim);
-        }
-      } catch (e) { console.warn(e); }
-
-      todos = await LojaDB.getProdutos();
-      document.getElementById('gridDestaque').innerHTML = todos.filter(p => p.destaque).slice(0, 6).map(cardHTML).join('') || '<p class="empty">—</p>';
-      document.getElementById('gridTendencia').innerHTML = todos.filter(p => p.tendencia).slice(0, 6).map(cardHTML).join('') || '<p class="empty">—</p>';
-
-      const cats = await LojaDB.getCategorias();
-      document.getElementById('chipsCats').innerHTML =
-        `<button type="button" class="chip active" data-id="">Todos</button>` +
-        cats.map(c => `<button type="button" class="chip" data-id="${c.id}">${c.nome}</button>`).join('');
-      document.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
-        document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-        ch.classList.add('active');
-        catActiva = ch.dataset.id;
-        filtrar();
-      }));
-      filtrar();
+      };
     })();
   </script>
-
-  <div id="js-missing-hint" style="display:none;max-width:640px;margin:16px auto;padding:14px 16px;background:#fef3c7;border:1px solid #f59e0b;border-radius:12px;color:#92400e;font-size:14px">
-    ⚠️ Os ficheiros JavaScript não carregaram (pasta <code>js/</code> em falta no GitHub).
-    Envie a pasta <strong>js</strong> e a pasta <strong>admin</strong> para a raiz do repositório <code>lodjastore</code>.
-  </div>
-  <script>
-    window.addEventListener('load', function () {
-      if (typeof LojaDB === 'undefined') {
-        var h = document.getElementById('js-missing-hint');
-        if (h) h.style.display = 'block';
-      }
-    });
-  </script>
-
 </body>
 </html>

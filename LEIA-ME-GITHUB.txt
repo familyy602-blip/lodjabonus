@@ -1,0 +1,41 @@
+
+IMPORTANTE — UPLOAD NO GITHUB (lodjastore)
+==========================================
+
+O site abre com estilo, mas Catálogo vazio e Admin 404 significam:
+
+  ✗ pasta js/   NÃO está no GitHub
+  ✗ pasta admin/ NÃO está no GitHub
+
+O QUE ENVIAR (tudo DENTRO de loja-virtual, para a RAIZ do repo):
+
+  index.html
+  catalogo.html
+  carrinho.html
+  checkout.html
+  pedidos.html
+  produto.html
+  solicitar.html
+  logo-lodja.png
+  css/          <--- pasta inteira
+  js/           <--- pasta inteira (obrigatório para produtos)
+  admin/        <--- pasta inteira (obrigatório para login admin)
+  sql/
+
+COMO FAZER NO GITHUB (site):
+1. Abra o repositório lodjastore
+2. Delete ficheiros antigos se necessário
+3. Add file → Upload files
+4. Arraste TODAS as pastas: css, js, admin e os .html
+5. Commit changes
+6. Settings → Pages → Deploy from branch main / root
+7. Espere 2 minutos → Ctrl+F5
+
+TESTES:
+  https://familyy602-blip.github.io/lodjastore/js/loja-storage.js
+    → deve mostrar código (não 404)
+  https://familyy602-blip.github.io/lodjastore/admin/login.html
+    → deve abrir o login (não 404)
+
+Produtos no catálogo só aparecem depois de os criar em Admin → Produtos
+(e com a pasta js/ online).
