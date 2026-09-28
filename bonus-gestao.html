@@ -111,6 +111,18 @@
                 <input type="text" id="beNome" class="form-control" placeholder="Ex: 15% extra este fim de semana">
               </div>
               <div class="form-group">
+                <label>Início da promoção</label>
+                <input type="datetime-local" id="beDataInicio" class="form-control">
+              </div>
+              <div class="form-group">
+                <label>Fim da promoção (cronómetro na loja virtual)</label>
+                <input type="datetime-local" id="beDataFim" class="form-control">
+              </div>
+              <div id="beCronometro" class="kpi-mini" style="margin-bottom:12px;display:none">
+                <div class="l">Termina em</div>
+                <div class="v" id="beTimerText" style="font-size:18px;font-variant-numeric:tabular-nums">—</div>
+              </div>
+              <div class="form-group">
                 <label>Descrição</label>
                 <textarea id="beDesc" class="form-control" rows="3" placeholder="Detalhes da oferta"></textarea>
               </div>
@@ -325,6 +337,32 @@
         const be = cfgCache.bonusEspecial || {};
         document.getElementById('beActivo').value = be.activo ? 'true' : 'false';
         document.getElementById('beNome').value = be.nome || '';
+        (function(){
+          const toLocal = (iso) => {
+            if (!iso) return '';
+            const d = new Date(iso); if (isNaN(d)) return '';
+            const p = n => String(n).padStart(2,'0');
+            return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
+          };
+          const di = document.getElementById('beDataInicio');
+          const df = document.getElementById('beDataFim');
+          if (di) di.value = toLocal(be.dataInicio || be.data_inicio);
+          if (df) df.value = toLocal(be.dataFim || be.data_fim);
+          if (window._beTimerInterval) clearInterval(window._beTimerInterval);
+          const fimIso = be.dataFim || be.data_fim;
+          const cron = document.getElementById('beCronometro');
+          if (cron && fimIso && be.activo) {
+            cron.style.display = '';
+            const tick = () => {
+              const ms = Math.max(0, new Date(fimIso).getTime() - Date.now());
+              const d = Math.floor(ms/86400000), h = Math.floor((ms%86400000)/3600000);
+              const m = Math.floor((ms%3600000)/60000), s = Math.floor((ms%60000)/1000);
+              const el = document.getElementById('beTimerText');
+              if (el) el.textContent = d+'d '+String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m '+String(s).padStart(2,'0')+'s';
+            };
+            tick(); window._beTimerInterval = setInterval(tick, 1000);
+          } else if (cron) cron.style.display = 'none';
+        })();
         document.getElementById('beDesc').value = be.descricao || '';
         document.getElementById('beCodigo').value = be.codigo || '';
         document.getElementById('beModo').value = be.modoAcesso === 'clientes' ? 'clientes' : 'publico';
@@ -536,6 +574,10 @@
       if (!nome) { App.toast('Indique o nome da promoção', 'error'); return; }
       cfg.bonusEspecial = {
         activo: document.getElementById('beActivo').value === 'true',
+        dataInicio: document.getElementById('beDataInicio') && document.getElementById('beDataInicio').value
+          ? new Date(document.getElementById('beDataInicio').value).toISOString() : (antigo.dataInicio || null),
+        dataFim: document.getElementById('beDataFim') && document.getElementById('beDataFim').value
+          ? new Date(document.getElementById('beDataFim').value).toISOString() : (antigo.dataFim || null),
         nome,
         descricao: document.getElementById('beDesc').value.trim(),
         codigo: document.getElementById('beCodigo').value.trim(),
